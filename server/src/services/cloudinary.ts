@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import type { Request } from 'express';
+import type { StorageEngine } from 'multer';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,30 +9,41 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const carImageStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'omda/cars',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 1200, height: 800, crop: 'fill', quality: 'auto' }],
-  } as object,
-});
+interface CloudinaryFile extends Express.Multer.File {
+  path: string;
+  filename: string;
+}
 
-const documentStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'omda/documents',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-  } as object,
-});
+function cloudinaryStorage(folder: string, opts: Record<string, unknown> = {}): StorageEngine {
+  return {
+    _handleFile(_req: Request, file: Express.Multer.File, cb: (error: Error | null, info?: Partial<CloudinaryFile>) => void) {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder, ...opts },
+        (error, result) => {
+          if (error || !result) return cb(error ?? new Error('Upload failed'));
+          cb(null, { path: result.secure_url, filename: result.public_id });
+        }
+      );
+      file.stream.pipe(stream);
+    },
+    _removeFile(_req: Request, file: CloudinaryFile, cb: (error: Error | null) => void) {
+      cloudinary.uploader.destroy(file.filename, (error) => cb(error ?? null));
+    },
+  };
+}
 
 export const uploadCarImage = multer({
-  storage: carImageStorage,
+  storage: cloudinaryStorage('omda/cars', {
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1200, height: 800, crop: 'fill', quality: 'auto' }],
+  }),
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 export const uploadDocument = multer({
-  storage: documentStorage,
+  storage: cloudinaryStorage('omda/documents', {
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
+  }),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
