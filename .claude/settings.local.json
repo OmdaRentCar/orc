@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Force)",
+      "Bash(Select-Object -Property Name, FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\server\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\" -Recurse -Filter \"*.html\")",
+      "Bash(ls -la \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\\" | head -50)",
+      "Read(//c/Users/Oussama/Desktop/**)",
+      "Bash(dir \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\server\")",
+      "Bash(dir \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\")",
+      "Bash(xcopy /E /I /Y \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\public\" \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\client\\\\public\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Oussama\\\\Desktop\\\\omda\\\\client\\\\public\" -Recurse | ForEach-Object { $_.FullName })",
+      "Bash(node -e \"const bcrypt = require\\('bcryptjs'\\); bcrypt.hash\\('admin123', 10\\).then\\(h => console.log\\(h\\)\\);\")"
+    ]
+  }
+}

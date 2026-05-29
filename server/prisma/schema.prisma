@@ -1,0 +1,77 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_users")
+}
+
+model Car {
+  id           Int       @id @default(autoincrement())
+  brand        String
+  model        String
+  type         String
+  year         Int
+  price        Float
+  image        String?
+  available    Boolean   @default(true)
+  seats        Int       @default(5)
+  fuel         String    @default("Petrol")
+  transmission String    @default("Auto")
+  description  String?
+  features     String[]  @default([])
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  bookings     Booking[]
+
+  @@index([brand])
+  @@index([type])
+  @@map("cars")
+}
+
+model Booking {
+  id            Int            @id @default(autoincrement())
+  carId         Int            @map("car_id")
+  guestName     String         @map("guest_name")
+  phone         String
+  email         String?
+  startDate     String         @map("start_date")
+  endDate       String         @map("end_date")
+  status        String         @default("pending")
+  documentImage String?        @map("document_image")
+  total         Float
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  car           Car            @relation(fields: [carId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([carId, status, startDate, endDate])
+  @@index([createdAt])
+  @@map("bookings")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  bookingId Int?     @map("booking_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([read])
+  @@map("notifications")
+}

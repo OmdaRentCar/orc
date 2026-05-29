@@ -1,6 +1,13 @@
 node_modules/
 dist/
-server/*.db
-server/uploads/*
-!server/uploads/.gitkeep
+client/dist/
+server/dist/
+
+# Environment
 .env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
