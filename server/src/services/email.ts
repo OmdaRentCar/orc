@@ -61,7 +61,7 @@ function template(booking: BookingEmailData): string {
         </tr>
         <tr>
           <td style="text-align:center;padding-top:24px;">
-            <p style="color:#848c88;font-size:13px;margin:0 0 8px;">Need help? Contact us 24/7 at <a href="mailto:support@omdarentcar.com" style="color:#e72526;text-decoration:none;font-weight:600;">support@omdarentcar.com</a></p>
+            <p style="color:#848c88;font-size:13px;margin:0 0 8px;">Need help? Contact us 24/7 at <a href="mailto:omda@omdarentcar.tn" style="color:#e72526;text-decoration:none;font-weight:600;">omda@omdarentcar.tn</a></p>
             <p style="color:#848c88;font-size:12px;margin:0;">Omda Rent Car</p>
           </td>
         </tr>
