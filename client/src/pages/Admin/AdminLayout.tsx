@@ -12,6 +12,7 @@ const NAV = [
   { to: '/admin/bookings', label: 'Bookings', icon: '📋', end: false },
   { to: '/admin/cars', label: 'Manage Cars', icon: '🚗', end: false },
   { to: '/admin/history', label: 'History', icon: '📜', end: false },
+  { to: '/admin/settings', label: 'Settings', icon: '⚙️', end: false },
 ];
 
 function AdminSidebar({ onClose }: { onClose: () => void }) {

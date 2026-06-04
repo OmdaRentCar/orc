@@ -8,6 +8,7 @@ import Dashboard from './pages/Admin/Dashboard';
 import Bookings from './pages/Admin/Bookings';
 import Cars from './pages/Admin/Cars';
 import History from './pages/Admin/History';
+import Settings from './pages/Admin/Settings';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -34,6 +35,7 @@ function AppRoutes() {
         <Route path="bookings" element={<Bookings />} />
         <Route path="cars" element={<Cars />} />
         <Route path="history" element={<History />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

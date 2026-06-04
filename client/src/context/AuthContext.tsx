@@ -7,6 +7,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (token: string, user: AdminUser) => void;
   logout: () => void;
+  updateUser: (token: string, user: AdminUser) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -32,8 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((t: string, u: AdminUser) => {
+    localStorage.setItem('admin_token', t);
+    localStorage.setItem('admin_user', JSON.stringify(u));
+    setToken(t);
+    setUser(u);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
