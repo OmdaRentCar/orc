@@ -20,7 +20,7 @@ export default function Footer() {
         </div>
         <div>
           <p className="text-sm font-semibold text-brand-text mb-3">Contact</p>
-          <p className="text-sm text-brand-muted">support@omdarentcar.com</p>
+          <p className="text-sm text-brand-muted">omda@omdarentcar.tn</p>
           <p className="text-sm text-brand-muted mt-1">24/7 support available</p>
         </div>
       </div>

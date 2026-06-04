@@ -13,7 +13,7 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const username = process.env.SEED_ADMIN_USERNAME || 'admin';
   const password = process.env.SEED_ADMIN_PASSWORD || 'admin123';
-  const email = process.env.SEED_ADMIN_EMAIL || 'admin@omdarentcar.com';
+  const email = process.env.SEED_ADMIN_EMAIL || 'omda@omdarentcar.tn';
 
   const existing = await prisma.adminUser.findUnique({ where: { username } });
   if (!existing) {
