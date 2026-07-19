@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 // requestAnimationFrame is available in workers that own an OffscreenCanvas (Chrome/Firefox/Safari)
 declare function requestAnimationFrame(cb: FrameRequestCallback): number;
@@ -95,20 +98,14 @@ function initScene(canvas: OffscreenCanvas, width: number, height: number) {
   keyLight.target = keyLightTarget;
   scene.add(keyLight);
 
-  import('three/examples/jsm/loaders/RGBELoader.js').then(({ RGBELoader }) => {
-    new RGBELoader().load(HDR_URL, (tex) => {
-      tex.mapping = THREE.EquirectangularReflectionMapping;
-      scene.environment = tex;
-    });
+  new RGBELoader().load(HDR_URL, (tex) => {
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = tex;
   });
 
   let car: THREE.Object3D | null = null;
   (async () => {
     try {
-      const [{ GLTFLoader }, { MeshoptDecoder }] = await Promise.all([
-        import('three/examples/jsm/loaders/GLTFLoader.js'),
-        import('three/examples/jsm/libs/meshopt_decoder.module.js'),
-      ]);
       const loader = new GLTFLoader();
       loader.setMeshoptDecoder(MeshoptDecoder);
       const gltf = await new Promise<{ scene: THREE.Group }>((resolve, reject) => {
