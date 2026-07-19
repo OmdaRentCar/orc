@@ -10,6 +10,23 @@ import BookingModal from './BookingModal';
 import FeaturesSection from './FeaturesSection';
 import type { Car } from '../../types';
 import { apiJSON } from '../../services/api';
+import ScrollScene from '../../components/three/ScrollScene';
+
+function OverviewSection() {
+  return (
+    <section id="section-overview" className="relative min-h-[110vh] flex items-center pointer-events-none px-6">
+      <div className="max-w-xl">
+        <p className="section-tag opacity-0 animate-fade-up">Overview</p>
+        <h2 className="font-display text-[clamp(40px,6vw,80px)] font-extrabold uppercase leading-[0.92] tracking-tight text-brand-text mb-8 opacity-0 animate-fade-up" style={{ animationDelay: '0.1s' }}>
+          Built on Trust,<br />Driven by Passion
+        </h2>
+        <p className="text-brand-muted text-sm leading-[1.8] max-w-md opacity-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
+          Omda Rent Car was founded on a simple idea — renting a premium vehicle should feel as exceptional as driving one. Every car in our fleet is hand-inspected, every booking backed by a real team, and every journey treated like it's the only one that matters.
+        </p>
+      </div>
+    </section>
+  );
+}
 
 function CarsSection() {
   const { showToast } = useToast();
@@ -51,20 +68,19 @@ function CarsSection() {
 
   return (
     <>
-      <section id="cars" className="max-w-7xl mx-auto px-6 py-16">
-        <div className="mb-10">
-          <p className="text-brand-red text-sm font-semibold tracking-widest uppercase mb-2">Our Fleet</p>
-          <h2 className="font-display text-4xl font-extrabold text-brand-text mb-6">Premium Vehicles</h2>
+      <section id="section-fleet" className="relative min-h-[110vh] pointer-events-none max-w-7xl mx-auto px-6 py-32">
+        <div className="mb-10 pointer-events-auto">
+          <p className="section-tag">Our Fleet</p>
+          <h2 className="font-display text-4xl font-extrabold uppercase text-brand-text mb-6 tracking-tight">Premium Vehicles</h2>
           <FilterBar filters={filters} onChange={setFilters} brands={brands} types={types} />
         </div>
 
         {filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">🔍</p>
-            <p className="text-brand-muted">No cars match your filters.</p>
+          <div className="text-center py-20 pointer-events-auto">
+            <p className="text-brand-muted text-sm uppercase tracking-[0.2em]">No cars match your filters</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pointer-events-auto">
             {filtered.map((car) => (
               <CarCard key={car.id} car={car} onClick={() => setSelectedCar(car)} />
             ))}
@@ -85,12 +101,18 @@ export default function HomePage() {
   return (
     <ToastProvider>
       <SplashScreen />
-      <div className="min-h-screen bg-brand-dark">
+      <div className="relative min-h-screen bg-brand-dark">
+        <ScrollScene />
         <Navbar />
-        <HeroSection />
-        <CarsSection />
-        <FeaturesSection />
-        <Footer />
+        <div id="scroll-container" className="relative z-10 pointer-events-none">
+          <HeroSection />
+          <OverviewSection />
+          <CarsSection />
+          <FeaturesSection />
+          <section id="section-cta" className="relative min-h-screen flex items-end pointer-events-none">
+            <Footer />
+          </section>
+        </div>
       </div>
     </ToastProvider>
   );

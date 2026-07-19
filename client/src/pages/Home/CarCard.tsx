@@ -5,18 +5,11 @@ interface Props {
   onClick: () => void;
 }
 
-const FUEL_ICON: Record<string, string> = {
-  Electric: '⚡',
-  Hybrid: '🔋',
-  Petrol: '⛽',
-  Diesel: '🛢️',
-};
-
 export default function CarCard({ car, onClick }: Props) {
   return (
     <div
       onClick={onClick}
-      className="glass-card overflow-hidden cursor-pointer group hover:border-brand-red/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-red/5"
+      className="cursor-pointer group bg-brand-dark/70 backdrop-blur-sm border border-white/[0.06] hover:border-brand-red/30 transition-all duration-300 hover:-translate-y-1"
     >
       <div className="relative h-48 overflow-hidden bg-brand-surface">
         {car.image ? (
@@ -28,7 +21,7 @@ export default function CarCard({ car, onClick }: Props) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-6xl opacity-20">🚗</span>
+            <span className="text-xs text-brand-muted uppercase tracking-[0.2em]">No Image</span>
           </div>
         )}
         <div className="absolute top-3 left-3">
@@ -37,38 +30,47 @@ export default function CarCard({ car, onClick }: Props) {
           </span>
         </div>
         <div className="absolute top-3 right-3">
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-dark/80 text-brand-red backdrop-blur-sm">
-            {FUEL_ICON[car.fuel] ?? '⛽'} {car.type}
+          <span className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] bg-brand-dark/80 text-brand-text border border-white/10 backdrop-blur-sm">
+            {car.type}
           </span>
         </div>
       </div>
 
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-xs text-brand-muted font-medium">{car.brand}</p>
-            <h3 className="font-display font-bold text-brand-text text-lg leading-tight">{car.model}</h3>
-            <p className="text-xs text-brand-muted">{car.year}</p>
+            <p className="text-[10px] text-brand-muted uppercase tracking-[0.2em]">{car.brand}</p>
+            <h3 className="font-display font-bold text-brand-text text-xl leading-tight tracking-tight">{car.model}</h3>
+            <p className="text-[10px] text-brand-muted mt-0.5">{car.year}</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-extrabold text-brand-red">${car.price}</p>
-            <p className="text-xs text-brand-muted">/ day</p>
+            <p className="font-display text-2xl font-bold text-brand-red tracking-tight">{car.price} <span className="text-lg">DT</span></p>
+            <p className="text-[10px] text-brand-muted uppercase tracking-[0.15em]">/ day</p>
           </div>
         </div>
 
-        <div className="flex gap-3 text-xs text-brand-muted mb-4">
-          <span>👥 {car.seats}</span>
-          <span>⚙️ {car.transmission}</span>
-          <span>{FUEL_ICON[car.fuel] ?? '⛽'} {car.fuel}</span>
+        <div className="border-t border-white/[0.06] pt-3 mb-4 grid grid-cols-3 gap-2">
+          <div>
+            <p className="text-[9px] text-brand-muted uppercase tracking-[0.15em]">Seats</p>
+            <p className="text-xs font-semibold text-brand-text mt-0.5">{car.seats}</p>
+          </div>
+          <div>
+            <p className="text-[9px] text-brand-muted uppercase tracking-[0.15em]">Gearbox</p>
+            <p className="text-xs font-semibold text-brand-text mt-0.5">{car.transmission}</p>
+          </div>
+          <div>
+            <p className="text-[9px] text-brand-muted uppercase tracking-[0.15em]">Fuel</p>
+            <p className="text-xs font-semibold text-brand-text mt-0.5">{car.fuel}</p>
+          </div>
         </div>
 
         {car.features.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             {car.features.slice(0, 3).map((f) => (
-              <span key={f} className="px-2 py-0.5 rounded-full text-xs bg-white/5 text-brand-muted border border-white/5">{f}</span>
+              <span key={f} className="px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-brand-muted border border-white/[0.08]">{f}</span>
             ))}
             {car.features.length > 3 && (
-              <span className="px-2 py-0.5 rounded-full text-xs bg-white/5 text-brand-muted border border-white/5">+{car.features.length - 3}</span>
+              <span className="px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-brand-muted border border-white/[0.08]">+{car.features.length - 3}</span>
             )}
           </div>
         )}
@@ -76,7 +78,7 @@ export default function CarCard({ car, onClick }: Props) {
         <button
           onClick={(e) => { e.stopPropagation(); onClick(); }}
           disabled={!car.available}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand-red text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer w-full py-3 text-[11px] font-semibold tracking-[0.2em] uppercase border border-brand-red text-brand-red hover:bg-brand-red hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-brand-red transition-colors duration-300"
         >
           {car.available ? 'Book Now' : 'Unavailable'}
         </button>

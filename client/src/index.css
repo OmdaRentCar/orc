@@ -34,6 +34,37 @@
     @apply bg-white/[0.03] border border-white/[0.06] rounded-2xl backdrop-blur-sm;
   }
 
+  .section-tag {
+    @apply flex items-center gap-3 text-brand-red text-[11px] font-semibold tracking-[0.25em] uppercase mb-5;
+  }
+
+  .section-tag::before {
+    content: '';
+    @apply w-6 h-px bg-brand-red;
+  }
+
+  .stroke-text {
+    -webkit-text-stroke: 1px theme('colors.brand.text');
+    color: transparent;
+  }
+
+  .scroll-progress {
+    @apply fixed top-0 left-0 h-px bg-brand-red z-[200];
+    transition: width 0.1s linear;
+  }
+
+  .spec-row {
+    @apply flex items-baseline justify-between gap-6 py-3 border-b border-white/[0.06] text-xs;
+  }
+
+  .spec-row .spec-name {
+    @apply text-brand-muted tracking-[0.12em] uppercase;
+  }
+
+  .spec-row .spec-val {
+    @apply font-display font-bold text-brand-text text-base tracking-tight;
+  }
+
   .badge-available {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20;
   }
@@ -52,5 +83,16 @@
 
   .badge-declined {
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-down,
+  .animate-fade-in,
+  .animate-slide-in-right {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

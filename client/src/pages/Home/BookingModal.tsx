@@ -106,7 +106,7 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
             <div>
               <p className="text-xs text-brand-muted">{car.brand}</p>
               <h3 className="font-display text-xl font-bold text-brand-text">{car.model}</h3>
-              <p className="text-brand-red font-bold text-lg">${car.price}<span className="text-brand-muted text-sm font-normal">/day</span></p>
+              <p className="text-brand-red font-bold text-lg">{car.price} DT<span className="text-brand-muted text-sm font-normal">/day</span></p>
             </div>
           </div>
 
@@ -157,8 +157,8 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
 
             {days > 0 && (
               <div className="p-3 rounded-xl bg-brand-red/5 border border-brand-red/20 flex justify-between items-center">
-                <span className="text-sm text-brand-muted">{days} day{days > 1 ? 's' : ''} × ${car.price}</span>
-                <span className="font-display text-xl font-bold text-brand-red">${total.toFixed(0)}</span>
+                <span className="text-sm text-brand-muted">{days} day{days > 1 ? 's' : ''} × {car.price} DT</span>
+                <span className="font-display text-xl font-bold text-brand-red">{total.toFixed(0)} DT</span>
               </div>
             )}
 

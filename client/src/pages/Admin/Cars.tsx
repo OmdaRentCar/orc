@@ -120,7 +120,7 @@ export default function Cars() {
                     <p className="text-xs text-brand-muted">{car.year}</p>
                   </td>
                   <td className="px-4 py-3 text-brand-muted text-xs">{car.type}</td>
-                  <td className="px-4 py-3 text-brand-red font-bold">${car.price}</td>
+                  <td className="px-4 py-3 text-brand-red font-bold">{car.price} DT</td>
                   <td className="px-4 py-3">
                     <Badge status={car.available ? 'available' : 'maintenance'} />
                   </td>

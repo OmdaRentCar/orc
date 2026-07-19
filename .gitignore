@@ -11,3 +11,11 @@ server/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Large 3D assets (served via Cloudinary CDN)
+client/public/models/*.glb
+examplePage.html
+
+# Large 3D assets & reference files
+client/public/models/porsche.glb
+examplePage.html

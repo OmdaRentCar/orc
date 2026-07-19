@@ -4,7 +4,7 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(false), 4200);
+    const t = setTimeout(() => setVisible(false), 500);
     return () => clearTimeout(t);
   }, []);
 
@@ -27,12 +27,12 @@ export default function SplashScreen() {
         ))}
       </div>
       <div className="relative text-center">
-        <h1 className="font-display text-5xl font-extrabold text-brand-text tracking-tight">
+        <h1 className="font-display text-6xl font-black uppercase tracking-tight text-brand-text">
           Omda<span className="text-brand-red">.</span>
         </h1>
-        <p className="mt-2 text-brand-muted text-sm tracking-widest uppercase">Car Rental</p>
+        <p className="mt-2 text-brand-muted text-[11px] tracking-[0.3em] uppercase">Car Rental</p>
         <div className="mt-6 flex justify-center">
-          <div className="w-8 h-0.5 bg-brand-red rounded-full animate-pulse" />
+          <div className="w-8 h-px bg-brand-red animate-pulse" />
         </div>
       </div>
     </div>
