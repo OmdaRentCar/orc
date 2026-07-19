@@ -3,6 +3,18 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
+// Workers lack `Image`. GLTFLoader calls `new Image()` inside detectSupport() to probe
+// WebP/AVIF format support before loading embedded textures. Stub it so the check
+// always resolves as "supported" — every browser that has OffscreenCanvas supports WebP.
+if (typeof (globalThis as Record<string, unknown>).Image === 'undefined') {
+  (globalThis as Record<string, unknown>).Image = class {
+    height = 1;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    set src(_: string) { setTimeout(() => this.onload?.(), 0); }
+  };
+}
+
 // requestAnimationFrame is available in workers that own an OffscreenCanvas (Chrome/Firefox/Safari)
 declare function requestAnimationFrame(cb: FrameRequestCallback): number;
 
