@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { api } from '../../services/api';
+import BusinessSettingsForm from './BusinessSettingsForm';
 
 export default function Settings() {
-  const { user, token, updateUser } = useAuth();
+  const { user, isOwner, updateUser } = useAuth();
   const { showToast } = useToast();
 
   const [username, setUsername] = useState(user?.username ?? '');
@@ -27,12 +29,8 @@ export default function Settings() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/me`, {
+      const res = await api('/auth/me', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           username,
           email,
@@ -60,8 +58,9 @@ export default function Settings() {
   }
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-brand-text mb-1">Settings</h1>
+    <div className="max-w-2xl space-y-8">
+      <div>
+      <h1 className="font-display text-2xl font-bold text-brand-text mb-1">Settings</h1>
       <p className="text-sm text-brand-muted mb-8">Update your admin account credentials.</p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -142,6 +141,9 @@ export default function Settings() {
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
+      </div>
+
+      {isOwner && <BusinessSettingsForm />}
     </div>
   );
 }

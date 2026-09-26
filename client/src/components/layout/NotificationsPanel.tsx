@@ -13,6 +13,10 @@ export default function NotificationsPanel({ open, onClose }: Props) {
     booking_approved: '✅',
     booking_declined: '❌',
     booking_pending: '⏳',
+    booking_picked_up: '🚗',
+    booking_completed: '🏁',
+    booking_cancelled: '🚫',
+    booking_updated: '✏️',
     info: 'ℹ️',
   };
 

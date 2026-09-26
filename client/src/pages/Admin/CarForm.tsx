@@ -27,6 +27,9 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
   const [available, setAvailable] = useState(car?.available ?? true);
   const [imageUrl, setImageUrl] = useState(car?.image ?? '');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [galleryKeep, setGalleryKeep] = useState<string[]>(car?.images ?? []);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -53,9 +56,11 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
 
       if (imageFile) {
         fd.append('image', imageFile);
-      } else if (imageUrl !== car?.image) {
+      } else if (imageUrl !== (car?.image ?? '')) {
         fd.append('image', imageUrl);
       }
+      if (isEdit) fd.append('gallery_keep', JSON.stringify(galleryKeep));
+      galleryFiles.forEach((f) => fd.append('gallery', f));
 
       const endpoint = isEdit ? `/cars/${car!.id}` : '/cars';
       const method = isEdit ? 'PUT' : 'POST';
@@ -104,7 +109,7 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
           <input type="number" value={year} onChange={(e) => setYear(e.target.value)} min={2000} max={2030} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Price/day ($) *</label>
+          <label className={labelClass}>Price/day (DT) *</label>
           <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min={1} required className={inputClass} placeholder="299" />
         </div>
       </div>
@@ -157,6 +162,48 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
             <p className="text-xs text-brand-muted">Click to upload image (JPG, PNG, WebP)</p>
           )}
         </div>
+      </div>
+
+      <div>
+        <label className={labelClass}>Gallery photos (shown on the car page, up to 12)</label>
+        {(galleryKeep.length > 0 || galleryFiles.length > 0) && (
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
+            {galleryKeep.map((url) => (
+              <div key={url} className="relative aspect-[3/2] rounded-lg overflow-hidden bg-brand-elevated">
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                <button type="button" onClick={() => setGalleryKeep((g) => g.filter((u) => u !== url))} aria-label="Remove photo" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-xs leading-none">×</button>
+              </div>
+            ))}
+            {galleryFiles.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="relative aspect-[3/2] rounded-lg overflow-hidden bg-brand-elevated flex items-center justify-center p-1">
+                <span className="text-[10px] text-brand-muted text-center break-all">{f.name}</span>
+                <button type="button" onClick={() => setGalleryFiles((g) => g.filter((_, j) => j !== i))} aria-label="Remove photo" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-xs leading-none">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={galleryKeep.length + galleryFiles.length >= 12}
+          className="w-full border border-dashed border-white/15 rounded-xl p-3 text-center cursor-pointer hover:border-brand-red/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={() => galleryRef.current?.click()}
+        >
+          <input
+            ref={galleryRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => {
+              // Copy the files before clearing the input: the FileList empties when the value is reset
+              const picked = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              const room = 12 - galleryKeep.length - galleryFiles.length;
+              setGalleryFiles((g) => [...g, ...picked.slice(0, Math.min(room, 8 - g.length))]);
+            }}
+          />
+          <span className="text-xs text-brand-muted">Add photos (up to 8 per save)</span>
+        </button>
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">

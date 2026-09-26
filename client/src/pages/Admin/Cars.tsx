@@ -6,12 +6,14 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Pagination from '../../components/ui/Pagination';
 import CarForm from './CarForm';
+import { useAuth } from '../../context/AuthContext';
 import type { Car } from '../../types';
 
 const PAGE_SIZE = 10;
 
 export default function Cars() {
   const { showToast } = useToast();
+  const { isOwner } = useAuth();
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,8 +42,8 @@ export default function Cars() {
       showToast('Car deleted', 'success');
       setDeleteId(null);
       load();
-    } catch {
-      showToast('Delete failed', 'error');
+    } catch (e) {
+      showToast((e as Error).message, 'error');
     }
   }
 
@@ -138,12 +140,12 @@ export default function Cars() {
                       >
                         {car.available ? 'Maintenance' : 'Available'}
                       </button>
-                      <button
+                      {isOwner && <button
                         onClick={() => setDeleteId(car.id)}
                         className="px-2.5 py-1 rounded-lg text-xs text-brand-muted hover:text-red-400 hover:bg-red-500/5 transition-colors"
                       >
                         Delete
-                      </button>
+                      </button>}
                     </div>
                   </td>
                 </tr>
@@ -167,7 +169,7 @@ export default function Cars() {
       <ConfirmDialog
         open={!!deleteId}
         title="Delete Car"
-        message={`Permanently delete this car and all its bookings?`}
+        message={`Permanently delete this car, its photos, and all its bookings with their ID documents?`}
         confirmLabel="Delete"
         danger
         onConfirm={deleteCar}
