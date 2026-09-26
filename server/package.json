@@ -1,5 +1,5 @@
 {
-  "name": "omda-server",
+  "name": "rentcar-server",
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
@@ -7,12 +7,17 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx prisma/seed.ts",
-    "migrate": "prisma migrate deploy"
+    "migrate": "prisma migrate deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "backup": "bash scripts/backup.sh",
+    "backup:verify": "bash scripts/verify-backup.sh"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
     "@prisma/adapter-neon": "^5.22.0",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^11.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
@@ -21,10 +26,11 @@
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^7.4.1",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.2",
+    "multer": "^2.4.0",
     "nodemailer": "^6.10.0",
     "socket.io": "^4.8.1",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -34,9 +40,12 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.0",
     "@types/nodemailer": "^6.4.17",
+    "@types/supertest": "^7.2.1",
     "@types/ws": "^8.18.1",
     "prisma": "^5.22.0",
+    "supertest": "^7.3.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11"
   }
 }

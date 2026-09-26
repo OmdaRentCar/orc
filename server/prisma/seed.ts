@@ -1,24 +1,19 @@
-import { PrismaNeon } from '@prisma/adapter-neon';
-import { PrismaClient } from '@prisma/client';
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import bcrypt from 'bcryptjs';
-import ws from 'ws';
 import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import { createPrismaClient } from '../src/lib/prisma';
 
-neonConfig.webSocketConstructor = ws;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaNeon(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = createPrismaClient();
 
 async function main() {
   const username = process.env.SEED_ADMIN_USERNAME || 'admin';
   const password = process.env.SEED_ADMIN_PASSWORD || 'admin123';
-  const email = process.env.SEED_ADMIN_EMAIL || 'omda@omdarentcar.tn';
+  const email = process.env.SEED_ADMIN_EMAIL || 'contact@example.com';
 
   const existing = await prisma.adminUser.findUnique({ where: { username } });
   if (!existing) {
     await prisma.adminUser.create({
-      data: { username, email, passwordHash: await bcrypt.hash(password, 10) },
+      // The first account must be an owner, or nobody could manage the team or business settings
+      data: { username, email, role: 'owner', passwordHash: await bcrypt.hash(password, 10) },
     });
     console.log(`Admin created: ${username}`);
   } else {
