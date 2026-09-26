@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: omda-server
+    name: rentcar-server
     env: node
     region: oregon
     rootDir: server
@@ -28,7 +28,7 @@ services:
       - key: SMTP_SECURE
         value: "false"
       - key: SMTP_USER
-        value: omda@omdarentcar.tn
+        value: contact@example.com
       - key: SMTP_PASS
         sync: false
       - key: PORT
