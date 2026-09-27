@@ -60,7 +60,7 @@ function CarsSection() {
   }, []);
 
   const filtered = useMemo(() => cars.filter((c) => {
-    if (filters.availableOnly && !c.available) return false;
+    if (filters.availableOnly && (!c.available || c.documentsExpired?.length)) return false;
     if (filters.brand && c.brand !== filters.brand) return false;
     if (filters.type && c.type !== filters.type) return false;
     if (c.price > filters.maxPrice) return false;

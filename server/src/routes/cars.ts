@@ -5,6 +5,8 @@ import { HttpError, parseBody, parseId } from '../lib/http';
 import { authMiddleware, requireOwner } from '../middleware/auth';
 import { uploadCarImages, deleteAsset } from '../services/cloudinary';
 import { audit } from '../services/audit';
+import { expiredDocuments } from '../services/rules';
+import { isoDate, todayISO } from '../lib/dates';
 
 const router = Router();
 
@@ -33,7 +35,18 @@ const carFields = {
   description: z.string().trim().max(2000).nullable(),
   features,
   image: optionalUrl,
+  plateNumber: z.preprocess((v) => (v === '' ? null : v), z.string().trim().max(30).nullable()),
+  mileage: z.coerce.number().int().min(0).max(2_000_000),
+  insuranceExpiry: z.preprocess((v) => (v === '' || v === 'null' ? null : v), isoDate.nullable()),
+  vignetteExpiry: z.preprocess((v) => (v === '' || v === 'null' ? null : v), isoDate.nullable()),
+  inspectionExpiry: z.preprocess((v) => (v === '' || v === 'null' ? null : v), isoDate.nullable()),
+  nextServiceKm: z.preprocess((v) => (v === '' || v === 'null' ? null : v), z.coerce.number().int().min(0).max(2_000_000).nullable()),
 };
+
+// Expired documents make a car unbookable; the list says so, so the site can show it as unavailable
+function withDocumentStatus<T extends { insuranceExpiry: string | null; vignetteExpiry: string | null; inspectionExpiry: string | null }>(car: T) {
+  return { ...car, documentsExpired: expiredDocuments(car, todayISO()) };
+}
 
 const createCarSchema = z.object({
   brand: carFields.brand,
@@ -48,6 +61,12 @@ const createCarSchema = z.object({
   description: carFields.description.optional(),
   features: carFields.features.default([]),
   image: carFields.image.optional(),
+  plateNumber: carFields.plateNumber.optional(),
+  mileage: carFields.mileage.default(0),
+  insuranceExpiry: carFields.insuranceExpiry.optional(),
+  vignetteExpiry: carFields.vignetteExpiry.optional(),
+  inspectionExpiry: carFields.inspectionExpiry.optional(),
+  nextServiceKm: carFields.nextServiceKm.optional(),
 });
 
 const updateCarSchema = z.object({
@@ -63,7 +82,7 @@ const updateCarSchema = z.object({
 
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   const cars = await prisma.car.findMany({ orderBy: { id: 'desc' } });
-  res.json(cars);
+  res.json(cars.map(withDocumentStatus));
 });
 
 router.get('/brands', async (_req: Request, res: Response): Promise<void> => {
@@ -79,7 +98,7 @@ router.get('/types', async (_req: Request, res: Response): Promise<void> => {
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const car = await prisma.car.findUnique({ where: { id: parseId(req.params.id) } });
   if (!car) throw new HttpError(404, 'Car not found');
-  res.json(car);
+  res.json(withDocumentStatus(car));
 });
 
 router.post('/', authMiddleware, uploadCarImages, async (req: Request, res: Response): Promise<void> => {
@@ -148,7 +167,7 @@ router.delete('/:id', authMiddleware, requireOwner, async (req: Request, res: Re
   const id = parseId(req.params.id);
   const car = await prisma.car.findUnique({
     where: { id },
-    include: { bookings: { select: { documentImage: true } } },
+    include: { bookings: { select: { documentImage: true, inspections: { select: { photos: true, signature: true } }, onlineContract: { select: { signature: true, pdfUrl: true } } } } },
   });
   if (!car) throw new HttpError(404, 'Car not found');
 
@@ -158,6 +177,8 @@ router.delete('/:id', authMiddleware, requireOwner, async (req: Request, res: Re
     deleteAsset(car.image),
     ...car.images.map(deleteAsset),
     ...car.bookings.map((b) => deleteAsset(b.documentImage)),
+    ...car.bookings.flatMap((b) => b.inspections.flatMap((i) => [...i.photos, i.signature].map(deleteAsset))),
+    ...car.bookings.flatMap((b) => [b.onlineContract?.signature, b.onlineContract?.pdfUrl].map(deleteAsset)),
   ]);
   await audit(req, 'delete', 'car', id, `${car.brand} ${car.model} and ${car.bookings.length} booking(s)`);
   res.json({ message: 'Car deleted' });

@@ -5,6 +5,8 @@ import PublicLayout from './pages/Public/PublicLayout';
 import HomePage from './pages/Home/HomePage';
 import CarPage from './pages/Public/CarPage';
 import StatusPage from './pages/Public/StatusPage';
+import SignContract from './pages/Public/SignContract';
+import VerifyContract from './pages/Public/VerifyContract';
 import LoginPage from './pages/Login/LoginPage';
 import AdminLayout from './pages/Admin/AdminLayout';
 import Dashboard from './pages/Admin/Dashboard';
@@ -16,6 +18,9 @@ import History from './pages/Admin/History';
 import Team from './pages/Admin/Team';
 import Activity from './pages/Admin/Activity';
 import Settings from './pages/Admin/Settings';
+import Handover from './pages/Admin/Handover';
+import Fines from './pages/Admin/Fines';
+import Finances from './pages/Admin/Finances';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -35,6 +40,8 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/cars/:id" element={<CarPage />} />
         <Route path="/booking-status" element={<StatusPage />} />
+        <Route path="/sign/:token" element={<SignContract />} />
+        <Route path="/verify" element={<VerifyContract />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -49,6 +56,9 @@ function AppRoutes() {
       >
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<Bookings />} />
+        <Route path="bookings/:id/handover/:type" element={<Handover />} />
+        <Route path="fines" element={<Fines />} />
+        <Route path="finances" element={<Finances />} />
         <Route path="calendar" element={<FleetCalendar />} />
         <Route path="cars" element={<Cars />} />
         <Route path="customers" element={<Customers />} />

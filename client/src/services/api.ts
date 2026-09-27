@@ -32,3 +32,18 @@ export async function apiJSON<T>(endpoint: string, options: RequestInit = {}): P
   }
   return res.json() as Promise<T>;
 }
+
+// Opens a PDF that needs the admin login (contract, return report) in a new tab
+export async function openAuthedPdf(endpoint: string): Promise<void> {
+  const tab = window.open('', '_blank');
+  const res = await api(endpoint);
+  if (!res.ok) {
+    tab?.close();
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  if (tab) tab.location.href = url;
+  else window.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

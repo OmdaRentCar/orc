@@ -4,7 +4,9 @@ import Badge from '../../components/ui/Badge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { apiJSON } from '../../services/api';
+import { apiJSON, openAuthedPdf } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
+import OnlineContractPanel from './OnlineContractPanel';
 import type { Booking, BookingStatus, PaymentStatus } from '../../types';
 import { money, whatsappUrl } from '../../utils/format';
 
@@ -22,12 +24,12 @@ const ACTIONS: Record<BookingStatus, { to: BookingStatus; label: string; style: 
     { to: 'cancelled', label: 'Cancel', style: 'bg-white/5 text-brand-muted hover:text-brand-text' },
   ],
   approved: [
-    { to: 'picked_up', label: 'Mark picked up', style: 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20' },
+    { to: 'picked_up', label: 'Mark picked up (no inspection)', style: 'bg-white/5 text-brand-muted hover:text-brand-text' },
     { to: 'cancelled', label: 'Cancel', style: 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' },
     { to: 'pending', label: 'Back to pending', style: 'bg-white/5 text-brand-muted hover:text-brand-text' },
   ],
   picked_up: [
-    { to: 'completed', label: 'Mark returned', style: 'bg-green-500/10 text-green-400 hover:bg-green-500/20' },
+    { to: 'completed', label: 'Mark returned (no inspection)', style: 'bg-white/5 text-brand-muted hover:text-brand-text' },
   ],
   declined: [{ to: 'pending', label: 'Reopen', style: 'bg-white/5 text-brand-muted hover:text-brand-text' }],
   cancelled: [{ to: 'pending', label: 'Reopen', style: 'bg-white/5 text-brand-muted hover:text-brand-text' }],
@@ -80,6 +82,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function BookingDetails({ booking, onClose, onChanged, onEdit }: Props) {
   const { showToast } = useToast();
   const { isOwner } = useAuth();
+  const navigate = useNavigate();
+  const [chargeLabel, setChargeLabel] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid');
   const [amountPaid, setAmountPaid] = useState('0');
@@ -160,7 +165,32 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
     }
   }
 
-  const balance = Math.max(0, b.total - b.amountPaid);
+  const balance = Math.max(0, b.total + b.extraChargesTotal - b.amountPaid);
+  const handedOver = b.status === 'picked_up' || b.status === 'completed';
+
+  async function openPdf(path: string) {
+    try { await openAuthedPdf(path); } catch (e) { showToast((e as Error).message, 'error'); }
+  }
+
+  async function addCharge(e: React.FormEvent) {
+    e.preventDefault();
+    const amount = Number(chargeAmount);
+    if (chargeLabel.trim().length < 2 || !(amount > 0)) { showToast('Enter a description and an amount', 'error'); return; }
+    try {
+      const updated = await apiJSON<Booking>(`/bookings/${b.id}/charges`, { method: 'POST', body: JSON.stringify({ label: chargeLabel.trim(), amount, kind: 'damage' }) });
+      setChargeLabel(''); setChargeAmount('');
+      showToast('Charge added', 'success');
+      onChanged(updated);
+    } catch (err) { showToast((err as Error).message, 'error'); }
+  }
+
+  async function removeCharge(index: number) {
+    try {
+      const updated = await apiJSON<Booking>(`/bookings/${b.id}/charges/${index}`, { method: 'DELETE' });
+      showToast('Charge removed', 'success');
+      onChanged(updated);
+    } catch (err) { showToast((err as Error).message, 'error'); }
+  }
 
   return (
     <>
@@ -175,6 +205,29 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
             <Badge status={b.paymentStatus} />
           </div>
         </div>
+
+        {(b.status === 'approved' || b.status === 'picked_up' || handedOver) && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {b.status === 'approved' && (
+              <button onClick={() => navigate(`/admin/bookings/${b.id}/handover/checkout`)} className="px-4 py-2 rounded-xl text-sm font-semibold bg-sky-500/15 text-sky-300 hover:bg-sky-500/25">
+                🔑 Start pick-up (photos + signature)
+              </button>
+            )}
+            {b.status === 'picked_up' && (
+              <button onClick={() => navigate(`/admin/bookings/${b.id}/handover/checkin`)} className="px-4 py-2 rounded-xl text-sm font-semibold bg-green-500/15 text-green-300 hover:bg-green-500/25">
+                🏁 Return car (inspection)
+              </button>
+            )}
+            {handedOver && (
+              <button onClick={() => openPdf(`/bookings/${b.id}/contract.pdf`)} className="px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 text-brand-text hover:bg-white/10">Contract (PDF)</button>
+            )}
+            {b.status === 'completed' && (
+              <button onClick={() => openPdf(`/bookings/${b.id}/return-report.pdf`)} className="px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 text-brand-text hover:bg-white/10">Return report (PDF)</button>
+            )}
+          </div>
+        )}
+
+        <OnlineContractPanel booking={b} />
 
         {ACTIONS[b.status].length > 0 && (
           <div className="flex flex-wrap gap-2 mb-5">
@@ -222,6 +275,14 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
             <Row label="Return">{b.endDate} · {b.returnTime}</Row>
             <Row label="Method">{b.deliveryType === 'delivery' ? `Delivery: ${b.deliveryAddress}` : 'At the agency'}</Row>
             <Row label="Extras">{b.extras.length ? b.extras.map((e) => e.name).join(', ') : '—'}</Row>
+            {(b.birthDate || b.licenseIssueDate || b.idNumber || b.licenseNumber) && (
+              <div className="border-t border-white/5 mt-1 pt-1">
+                {b.idNumber && <Row label="CIN / passport">{b.idNumber}</Row>}
+                {b.licenseNumber && <Row label="Licence n°">{b.licenseNumber}</Row>}
+                {b.birthDate && <Row label="Born">{b.birthDate}</Row>}
+                {b.licenseIssueDate && <Row label="Licence since">{b.licenseIssueDate}</Row>}
+              </div>
+            )}
             {b.notes && <p className="mt-2 text-xs text-brand-muted whitespace-pre-wrap border-t border-white/5 pt-2">{b.notes}</p>}
           </section>
 
@@ -235,6 +296,28 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
               <Row label="Total"><strong className="text-brand-red">{money(b.total)}</strong></Row>
               <Row label="Deposit (refundable)">{money(b.deposit)}</Row>
             </div>
+            {(b.extraCharges.length > 0 || handedOver) && (
+              <div className="border-t border-white/5 mt-2 pt-2">
+                <p className="text-xs uppercase tracking-wider text-brand-muted mb-1">Extra charges</p>
+                {b.extraCharges.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 py-1 text-sm">
+                    <span className="text-brand-muted">{c.label}</span>
+                    <span className="flex items-center gap-2 text-brand-text whitespace-nowrap">
+                      {money(c.amount)}
+                      <button onClick={() => removeCharge(i)} aria-label={`Remove charge ${c.label}`} className="text-brand-muted hover:text-red-400">×</button>
+                    </span>
+                  </div>
+                ))}
+                {handedOver && (
+                  <form onSubmit={addCharge} className="flex gap-1.5 mt-1.5">
+                    <input value={chargeLabel} onChange={(e) => setChargeLabel(e.target.value)} placeholder="e.g. scratch rear bumper" aria-label="Charge description" className="flex-1 min-w-0 bg-brand-surface border border-white/10 rounded-lg px-2 py-1 text-xs text-brand-text" />
+                    <input type="number" min={0} step="0.5" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="DT" aria-label="Charge amount (DT)" className="w-20 bg-brand-surface border border-white/10 rounded-lg px-2 py-1 text-xs text-brand-text" />
+                    <button type="submit" className="px-2 py-1 rounded-lg text-xs font-semibold bg-white/10 text-brand-text hover:bg-white/15">Add</button>
+                  </form>
+                )}
+                {b.extraChargesTotal > 0 && <Row label="Total with charges"><strong className="text-brand-red">{money(b.total + b.extraChargesTotal)}</strong></Row>}
+              </div>
+            )}
           </section>
 
           <section className="glass-card p-4">

@@ -29,3 +29,11 @@ export function rentalDays(startDate: string, endDate: string): number {
   const ms = Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`);
   return Math.max(1, Math.round(ms / 86_400_000));
 }
+
+// The UTC instant of a local date + time in the business timezone (e.g. "2027-07-01", "10:00" in Tunis)
+export function localInstant(date: string, time: string, timeZone = BUSINESS_TZ): Date {
+  const guess = new Date(`${date}T${time}:00Z`);
+  const local = new Date(guess.toLocaleString('en-US', { timeZone }));
+  const utc = new Date(guess.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(guess.getTime() - (local.getTime() - utc.getTime()));
+}

@@ -89,6 +89,8 @@ export function parseAssetUrl(url: string): AssetRef | null {
   if (!url.includes('res.cloudinary.com')) return null;
   const m = url.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:s--[^/]+--\/)?(?:v\d+\/)?(.+?)(?:\.([a-z0-9]+))?$/i);
   if (!m) return null;
+  // Raw files (PDFs) keep their extension as part of the public id
+  if (m[1] === 'raw') return { resourceType: 'raw', type: m[2], publicId: m[4] ? `${m[3]}.${m[4]}` : m[3] };
   return { resourceType: m[1], type: m[2], publicId: m[3], format: m[4] };
 }
 
@@ -112,6 +114,59 @@ export function signedDocumentUrl(url: string, ttlSeconds = 600): string {
     resource_type: ref.resourceType,
     expires_at: Math.floor(Date.now() / 1000) + ttlSeconds,
   });
+}
+
+// Handover photos and signatures: private, like ID documents
+export const uploadHandoverPhotos = multer({
+  storage: cloudinaryStorage('rentcar/handover', {
+    type: 'authenticated',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'heic'],
+    transformation: [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto' }],
+  }),
+  fileFilter: allowTypes([...IMAGE_TYPES, 'image/heic', 'image/heif'], 'JPG, PNG, WebP or HEIC'),
+  limits: { fileSize: 12 * 1024 * 1024, files: 16, fieldSize: 2 * 1024 * 1024 },
+}).array('photos', 16);
+
+export async function uploadPrivateImage(dataUrl: string, folder: string): Promise<string> {
+  const result = await cloudinary.uploader.upload(dataUrl, { folder, type: 'authenticated' }).catch((e: { message?: string }) => {
+    throw new UploadError(e.message ?? 'Upload failed');
+  });
+  return result.secure_url.replace(/\/s--[^/]+--(?=\/)/, '');
+}
+
+// Short-lived signed link to a resized JPEG of a private image, for showing photos and building PDFs
+export function signedImageUrl(url: string, width = 800): string {
+  const ref = parseAssetUrl(url);
+  if (!ref) return url;
+  if (ref.type === 'upload') return url;
+  return cloudinary.url(ref.publicId, {
+    type: ref.type,
+    resource_type: ref.resourceType,
+    sign_url: true,
+    secure: true,
+    format: 'jpg',
+    transformation: [{ width, crop: 'limit', quality: 'auto' }],
+  });
+}
+
+// Stores a finished PDF privately, exactly as generated (it must never change after signing)
+export function uploadPrivatePdf(pdf: Buffer, publicId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: 'raw', type: 'authenticated', public_id: publicId, overwrite: false },
+      (error, result) => {
+        if (error || !result) return reject(new UploadError(error?.message ?? 'Upload failed'));
+        resolve(result.secure_url.replace(/\/s--[^/]+--(?=\/)/, ''));
+      },
+    );
+    stream.end(pdf);
+  });
+}
+
+export async function downloadPrivateFile(url: string): Promise<Buffer> {
+  const res = await fetch(signedDocumentUrl(url, 120));
+  if (!res.ok) throw new UploadError(`Could not fetch the stored file (${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 export { cloudinary };

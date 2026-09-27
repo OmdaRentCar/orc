@@ -119,7 +119,8 @@ export default function Cars() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-brand-text font-medium">{car.brand} {car.model}</p>
-                    <p className="text-xs text-brand-muted">{car.year}</p>
+                    <p className="text-xs text-brand-muted">{car.year}{car.plateNumber ? ` · ${car.plateNumber}` : ''} · {car.mileage.toLocaleString()} km</p>
+                    {car.documentsExpired.length > 0 && <p className="text-xs text-red-400">Expired: {car.documentsExpired.join(', ')} · not bookable</p>}
                   </td>
                   <td className="px-4 py-3 text-brand-muted text-xs">{car.type}</td>
                   <td className="px-4 py-3 text-brand-red font-bold">{car.price} DT</td>

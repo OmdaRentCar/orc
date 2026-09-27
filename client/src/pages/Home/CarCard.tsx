@@ -10,6 +10,7 @@ interface Props {
 export default function CarCard({ car, onBook }: Props) {
   const { t, money } = useI18n();
   const photoCount = (car.image ? 1 : 0) + car.images.length;
+  const available = car.available && !car.documentsExpired?.length;
 
   return (
     <div className="group bg-brand-dark/70 backdrop-blur-sm border border-white/[0.06] hover:border-brand-red/30 transition-all duration-300 hover:-translate-y-1">
@@ -28,8 +29,8 @@ export default function CarCard({ car, onBook }: Props) {
             </div>
           )}
           <div className="absolute top-3 start-3">
-            <span className={car.available ? 'badge-available' : 'badge-maintenance'}>
-              ● {car.available ? t('card.available') : t('card.maintenance')}
+            <span className={available ? 'badge-available' : 'badge-maintenance'}>
+              ● {available ? t('card.available') : t('card.maintenance')}
             </span>
           </div>
           <div className="absolute top-3 end-3">
@@ -88,10 +89,10 @@ export default function CarCard({ car, onBook }: Props) {
       <div className="px-5 pb-5">
         <button
           onClick={onBook}
-          disabled={!car.available}
+          disabled={!available}
           className="cursor-pointer w-full py-3 text-[11px] font-semibold tracking-[0.2em] uppercase border border-brand-red text-brand-red hover:bg-brand-red hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-brand-red transition-colors duration-300"
         >
-          {car.available ? t('card.bookNow') : t('card.unavailable')}
+          {available ? t('card.bookNow') : t('card.unavailable')}
         </button>
       </div>
     </div>

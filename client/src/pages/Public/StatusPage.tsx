@@ -138,6 +138,14 @@ export default function StatusPage() {
                   <span className="font-semibold text-brand-text">{t('status.total')}</span>
                   <span className="font-display text-2xl font-bold text-brand-red">{money(result.total)}</span>
                 </div>
+                {result.extraCharges.length > 0 && (
+                  <div className="pt-2">
+                    <p className="text-brand-text font-semibold mb-1">{t('status.extraCharges')}</p>
+                    {result.extraCharges.map((c, i) => (
+                      <div key={i} className="flex justify-between gap-3 text-brand-muted"><span>{c.label}</span><span>{money(c.amount)}</span></div>
+                    ))}
+                  </div>
+                )}
                 {result.deposit > 0 && <div className="flex justify-between text-brand-muted"><span>{t('status.deposit')}</span><span>{money(result.deposit)}</span></div>}
                 <div className="flex justify-between text-brand-muted">
                   <span>{t('status.payment')}</span>
@@ -146,6 +154,9 @@ export default function StatusPage() {
                     {result.amountPaid > 0 && ` · ${t('status.amountPaid', { amount: result.amountPaid })}`}
                   </span>
                 </div>
+                {(result.status === 'completed' || result.extraChargesTotal > 0) && result.total + result.extraChargesTotal - result.amountPaid > 0.001 && (
+                  <div className="flex justify-between font-semibold text-brand-text"><span>{t('status.balance')}</span><span>{money(result.total + result.extraChargesTotal - result.amountPaid)}</span></div>
+                )}
               </div>
             </div>
 

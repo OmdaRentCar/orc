@@ -3,6 +3,8 @@ import prisma from '../lib/prisma';
 import { parseId } from '../lib/http';
 import { addDaysISO, todayISO } from '../lib/dates';
 import { authMiddleware } from '../middleware/auth';
+import { carAlerts } from '../services/jobs';
+import { localInstant } from '../lib/dates';
 
 const router = Router();
 
@@ -76,6 +78,20 @@ router.get('/', authMiddleware, async (_req: Request, res: Response): Promise<vo
 
   const byMonth = new Map(monthlyRows.map((r) => [r.month, r]));
 
+  const [alerts, outNow, finished] = await Promise.all([
+    carAlerts(),
+    prisma.booking.findMany({ where: { status: 'picked_up', endDate: { lte: today } }, include: { car: { select: { brand: true, model: true } } } }),
+    prisma.booking.findMany({ where: { status: 'completed' }, select: { id: true, reference: true, guestName: true, phone: true, total: true, extraChargesTotal: true, amountPaid: true } }),
+  ]);
+  const now = Date.now();
+  const lateReturns = outNow
+    .filter((b) => localInstant(b.endDate, b.returnTime).getTime() < now)
+    .map((b) => ({ id: b.id, reference: b.reference, guestName: b.guestName, phone: b.phone, locale: b.locale, car: `${b.car.brand} ${b.car.model}`, due: `${b.endDate} ${b.returnTime}` }));
+  const unpaid = finished
+    .map((b) => ({ ...b, balance: Math.round((b.total + b.extraChargesTotal - b.amountPaid) * 100) / 100 }))
+    .filter((b) => b.balance > 0.001)
+    .sort((a, b) => b.balance - a.balance);
+
   res.json({
     activeRentals,
     revenue: revenueAgg._sum.total ?? 0,
@@ -92,11 +108,17 @@ router.get('/', authMiddleware, async (_req: Request, res: Response): Promise<vo
       id: b.id,
       reference: b.reference,
       guestName: b.guestName,
+      phone: b.phone,
+      locale: b.locale,
       car: `${b.car.brand} ${b.car.model}`,
       kind: b.status === 'approved' ? 'pickup' : 'return',
       date: b.status === 'approved' ? b.startDate : b.endDate,
       time: b.status === 'approved' ? b.pickupTime : b.returnTime,
     })).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
+    alerts,
+    lateReturns,
+    unpaid: unpaid.slice(0, 10),
+    unpaidTotal: Math.round(unpaid.reduce((s, b) => s + b.balance, 0) * 100) / 100,
     monthly: months.map((month) => ({
       month,
       bookings: byMonth.get(month)?.bookings ?? 0,

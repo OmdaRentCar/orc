@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 import { useBusinessSettings } from '../../services/settings';
 import { whatsappUrl } from '../../utils/format';
@@ -6,7 +7,9 @@ import { whatsappUrl } from '../../utils/format';
 export default function WhatsAppButton() {
   const { t } = useI18n();
   const settings = useBusinessSettings();
-  if (!settings?.whatsappNumber) return null;
+  const { pathname } = useLocation();
+  // Hidden while signing: on a phone it would cover the "Sign" button
+  if (!settings?.whatsappNumber || pathname.startsWith('/sign/')) return null;
 
   return (
     <a

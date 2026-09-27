@@ -14,6 +14,7 @@ import { computeQuote, Quote } from '../services/pricing';
 import { getSettings } from '../services/settings';
 import { generateReference } from '../services/reference';
 import { verifyCaptcha } from '../services/captcha';
+import { driverProblem, documentsExpiringDuring } from '../services/rules';
 import { audit } from '../services/audit';
 
 const router = Router();
@@ -125,6 +126,24 @@ const quoteSchema = z.object({
   deliveryType: z.enum(['agency', 'delivery']).default('agency'),
 }).refine((b) => b.endDate >= b.startDate, { message: 'return date must be on or after pick-up date', path: ['endDate'] });
 
+const optionalDate = z.preprocess((v) => (v === '' || v === null ? undefined : v), isoDate.optional());
+const driverFields = {
+  birthDate: optionalDate,
+  licenseIssueDate: optionalDate,
+  licenseExpiry: optionalDate,
+  licenseNumber: z.string().trim().max(40).optional(),
+  idNumber: z.string().trim().max(40).optional(),
+  customerAddress: z.string().trim().max(300).optional(),
+};
+
+// A car can't be out while its insurance, vignette or technical inspection has run out
+function assertDocumentsValid(car: { brand: string; model: string; insuranceExpiry: string | null; vignetteExpiry: string | null; inspectionExpiry: string | null }, endDate: string) {
+  const expiring = documentsExpiringDuring(car, endDate);
+  if (expiring.length) {
+    throw new HttpError(409, `${car.brand} ${car.model}: ${expiring.map((d) => `${d.label} expires ${d.expiry}`).join(', ')}, before the end of this rental. Renew it first.`);
+  }
+}
+
 const publicBookingSchema = z.object({
   car_id: z.coerce.number().int().positive(),
   guest_name: z.string().trim().min(2).max(100),
@@ -138,6 +157,9 @@ const publicBookingSchema = z.object({
   delivery_address: z.string().trim().max(300).optional(),
   extras: extrasField,
   locale: z.enum(['en', 'fr', 'ar']).default('en'),
+  birth_date: isoDate,
+  license_issue_date: isoDate,
+  license_expiry: z.preprocess((v) => (v === '' ? undefined : v), isoDate.optional()),
 })
   .refine((b) => b.end_date >= b.start_date, { message: 'return date must be on or after pick-up date', path: ['end_date'] })
   .refine((b) => b.delivery_type !== 'delivery' || !!b.delivery_address, { message: 'delivery address is required', path: ['delivery_address'] });
@@ -157,6 +179,7 @@ const adminBookingSchema = z.object({
   status: z.enum(['pending', 'approved']).default('approved'),
   notes: z.string().trim().max(2000).optional().nullable(),
   locale: z.enum(['en', 'fr', 'ar']).default('en'),
+  ...driverFields,
 })
   .refine((b) => b.endDate >= b.startDate, { message: 'return date must be on or after pick-up date', path: ['endDate'] })
   .refine((b) => b.deliveryType !== 'delivery' || !!b.deliveryAddress, { message: 'delivery address is required', path: ['deliveryAddress'] });
@@ -175,6 +198,7 @@ const bookingEditSchema = z.object({
   extras: z.array(z.string().max(50)).max(20).optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
   locale: z.enum(['en', 'fr', 'ar']).optional(),
+  ...driverFields,
 });
 
 const statusSchema = z.object({ status: z.enum(['pending', 'approved', 'declined', 'cancelled', 'picked_up', 'completed']) });
@@ -227,6 +251,13 @@ router.post('/public', bookingLimiter, captchaGuard, uploadDocument.single('docu
     const car = await prisma.car.findUnique({ where: { id: input.car_id } });
     if (!car) throw new HttpError(404, 'Car not found');
     if (!car.available) throw new HttpError(400, 'This car is currently unavailable for booking');
+    if (documentsExpiringDuring(car, input.end_date).length) throw new HttpError(400, 'This car is not available for these dates');
+    const settings = await getSettings();
+    const problem = driverProblem(
+      { birthDate: input.birth_date, licenseIssueDate: input.license_issue_date, licenseExpiry: input.license_expiry },
+      input.start_date, input.end_date, settings,
+    );
+    if (problem) throw new HttpError(400, problem);
     if (await hasConflict(prisma, car.id, input.start_date, input.end_date)) {
       throw new HttpError(409, 'Car is already booked for these dates');
     }
@@ -253,6 +284,9 @@ router.post('/public', bookingLimiter, captchaGuard, uploadDocument.single('docu
         documentImage: uploadedDoc,
         locale: input.locale,
         source: 'online',
+        birthDate: input.birth_date,
+        licenseIssueDate: input.license_issue_date,
+        licenseExpiry: input.license_expiry ?? null,
         ...quoteFields(quote),
       },
       include: { car: carSummary },
@@ -301,6 +335,8 @@ router.get('/status', statusLimiter, async (req: Request, res: Response): Promis
     deposit: booking.deposit,
     paymentStatus: booking.paymentStatus,
     amountPaid: booking.amountPaid,
+    extraCharges: booking.extraCharges,
+    extraChargesTotal: booking.extraChargesTotal,
     createdAt: booking.createdAt,
   });
 });
@@ -328,10 +364,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
   const input = parseBody(adminBookingSchema, req.body);
   const car = await prisma.car.findUnique({ where: { id: input.carId } });
   if (!car) throw new HttpError(404, 'Car not found');
+  if (input.status === 'approved') assertDocumentsValid(car, input.endDate);
+  const settings = await getSettings();
+  const problem = driverProblem(input, input.startDate, input.endDate, settings);
+  if (problem) throw new HttpError(400, problem);
 
   const quote = computeQuote(
     { pricePerDay: car.price, startDate: input.startDate, endDate: input.endDate, extraIds: input.extras, deliveryType: input.deliveryType },
-    await getSettings(),
+    settings,
   );
 
   const booking = await withCarLock(car.id, async (tx) => {
@@ -355,6 +395,12 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
         notes: input.notes || null,
         locale: input.locale,
         source: 'admin',
+        birthDate: input.birthDate ?? null,
+        licenseIssueDate: input.licenseIssueDate ?? null,
+        licenseExpiry: input.licenseExpiry ?? null,
+        licenseNumber: input.licenseNumber || null,
+        idNumber: input.idNumber || null,
+        customerAddress: input.customerAddress || null,
         ...quoteFields(quote),
       },
       include: { car: carSummary },
@@ -402,6 +448,8 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
     ? computeQuote({ pricePerDay: car.price, startDate: next.startDate, endDate: next.endDate, extraIds: next.extras, deliveryType: next.deliveryType as 'agency' | 'delivery' }, await getSettings())
     : null;
 
+  if (existing.status === 'approved' && (input.carId !== undefined || input.endDate !== undefined)) assertDocumentsValid(car, next.endDate);
+
   const updated = await withCarLock(next.carId, async (tx) => {
     if (BLOCKING_STATUSES.includes(existing.status) && await hasConflict(tx, next.carId, next.startDate, next.endDate, id)) {
       throw new HttpError(409, 'Date conflict with another approved booking');
@@ -421,6 +469,12 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
         deliveryAddress: next.deliveryType === 'delivery' ? deliveryAddress : null,
         notes: input.notes === undefined ? undefined : input.notes || null,
         locale: input.locale,
+        birthDate: input.birthDate,
+        licenseIssueDate: input.licenseIssueDate,
+        licenseExpiry: input.licenseExpiry,
+        licenseNumber: input.licenseNumber,
+        idNumber: input.idNumber,
+        customerAddress: input.customerAddress,
         ...(quote ? quoteFields(quote) : {}),
       },
       include: { car: carSummary },
@@ -442,6 +496,8 @@ router.put('/:id/status', authMiddleware, async (req: Request, res: Response): P
   if (!TRANSITIONS[booking.status]?.includes(status)) {
     throw new HttpError(400, `Cannot change a ${booking.status} booking to ${status}`);
   }
+
+  if (status === 'approved') assertDocumentsValid(booking.car, booking.endDate);
 
   const updated = await withCarLock(booking.carId, async (tx) => {
     if (BLOCKING_STATUSES.includes(status) && await hasConflict(tx, booking.carId, booking.startDate, booking.endDate, id)) {
@@ -479,10 +535,15 @@ router.get('/:id/document', authMiddleware, async (req: Request, res: Response):
 
 router.delete('/:id', authMiddleware, requireOwner, async (req: Request, res: Response): Promise<void> => {
   const id = parseId(req.params.id);
-  const booking = await prisma.booking.findUnique({ where: { id } });
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { inspections: true, onlineContract: true } });
   if (!booking) throw new HttpError(404, 'Booking not found');
   await prisma.booking.delete({ where: { id } });
-  await deleteAsset(booking.documentImage);
+  await Promise.all([
+    deleteAsset(booking.documentImage),
+    ...booking.inspections.flatMap((i) => [...i.photos, i.signature].map(deleteAsset)),
+    deleteAsset(booking.onlineContract?.signature),
+    deleteAsset(booking.onlineContract?.pdfUrl),
+  ]);
   await audit(req, 'delete', 'booking', id, `${booking.reference} (${booking.guestName})`);
   res.json({ message: 'Booking deleted' });
 });

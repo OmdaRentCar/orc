@@ -18,7 +18,7 @@ const staff = () => ({ Authorization: `Bearer ${staffToken}` });
 
 function publicBooking(fields: Record<string, string>) {
   const req = request(app).post('/api/bookings/public');
-  for (const [k, v] of Object.entries({ car_id: String(carId), guest_name: 'Test Guest', phone: '+216 20 000 000', ...fields })) req.field(k, v);
+  for (const [k, v] of Object.entries({ car_id: String(carId), guest_name: 'Test Guest', phone: '+216 20 000 000', birth_date: '1990-05-01', license_issue_date: '2012-01-01', ...fields })) req.field(k, v);
   return req;
 }
 

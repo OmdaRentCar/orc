@@ -7,7 +7,7 @@ import type { Car, Booking, DeliveryType, Quote } from '../../types';
 import { apiJSON, api } from '../../services/api';
 import { useBusinessSettings } from '../../services/settings';
 import { useI18n, LANGS, Lang } from '../../i18n';
-import { localTodayISO, TIME_SLOTS } from '../../utils/format';
+import { fullYears, localTodayISO, TIME_SLOTS } from '../../utils/format';
 
 interface Props {
   car: Car | null;
@@ -34,6 +34,8 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [licenseDate, setLicenseDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [captchaToken, setCaptchaToken] = useState('');
   const [emailLang, setEmailLang] = useState<Lang>(lang);
@@ -58,6 +60,8 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
     setName('');
     setPhone('');
     setEmail('');
+    setBirthDate('');
+    setLicenseDate('');
     setFile(null);
     setError('');
     setReference('');
@@ -100,6 +104,10 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
     if (name.trim().length < 2) { setError(t('booking.errors.name')); return; }
     if (!/^\+?[\d\s\-()]{7,20}$/.test(phone.trim())) { setError(t('booking.errors.phone')); return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError(t('booking.errors.email')); return; }
+    if (!birthDate) { setError(t('booking.errors.birthDate')); return; }
+    if (!licenseDate) { setError(t('booking.errors.licenseDate')); return; }
+    if (settings && fullYears(birthDate, startDate) < settings.minDriverAge) { setError(t('booking.errors.tooYoung', { age: settings.minDriverAge })); return; }
+    if (settings && fullYears(licenseDate, startDate) < settings.minLicenseYears) { setError(t('booking.errors.licenseTooRecent', { years: settings.minLicenseYears })); return; }
     if (deliveryType === 'delivery' && !deliveryAddress.trim()) { setError(t('booking.errors.address')); return; }
     if (file && file.size > MAX_FILE_SIZE) { setError(t('booking.errors.fileSize')); return; }
     if (TURNSTILE_SITE_KEY && !captchaToken) { setError(t('booking.errors.captcha')); return; }
@@ -119,6 +127,8 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
       if (deliveryType === 'delivery') fd.append('delivery_address', deliveryAddress.trim());
       fd.append('extras', extras.join(','));
       fd.append('locale', emailLang);
+      fd.append('birth_date', birthDate);
+      fd.append('license_issue_date', licenseDate);
       if (file) fd.append('document', file);
 
       const res = await api('/bookings/public', {
@@ -251,10 +261,15 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
 
             {quote && (
               <div className="p-4 rounded-xl bg-brand-red/5 border border-brand-red/20 space-y-1.5 text-sm">
-                <div className="flex justify-between text-brand-muted">
-                  <span>{t('booking.days', { count: quote.days, price: quote.dailyRate })}</span>
-                  <span>{money(quote.subtotal)}</span>
-                </div>
+                {quote.lines.map((line) => (
+                  <div key={`${line.rate}-${line.label}`} className="flex justify-between gap-3 text-brand-muted">
+                    <span>
+                      {t('booking.days', { count: line.days, price: line.rate })}
+                      {line.label && <span className="text-brand-text/70"> · {line.label.replace('weekend', t('booking.weekend'))}</span>}
+                    </span>
+                    <span>{money(line.amount)}</span>
+                  </div>
+                ))}
                 {quote.discount > 0 && (
                   <div className="flex justify-between text-green-400">
                     <span>{t('booking.discount', { pct: quote.discountPct })}</span>
@@ -284,6 +299,20 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
             <div>
               <label className={labelClass} htmlFor="guest-name">{t('booking.name')} *</label>
               <input id="guest-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('booking.namePlaceholder')} required maxLength={100} autoComplete="name" className={inputClass} />
+            </div>
+
+            <div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass} htmlFor="birth-date">{t('booking.birthDate')} *</label>
+                  <input id="birth-date" type="date" value={birthDate} max={today} onChange={(e) => setBirthDate(e.target.value)} required dir="ltr" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="license-date">{t('booking.licenseDate')} *</label>
+                  <input id="license-date" type="date" value={licenseDate} max={today} onChange={(e) => setLicenseDate(e.target.value)} required dir="ltr" className={inputClass} />
+                </div>
+              </div>
+              {settings && <p className="text-[11px] text-brand-muted mt-1">{t('booking.driverHint', { age: settings.minDriverAge, years: settings.minLicenseYears })}</p>}
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">

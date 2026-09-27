@@ -14,6 +14,10 @@ import customersRouter from './routes/customers';
 import dashboardRouter from './routes/dashboard';
 import settingsRouter from './routes/settings';
 import auditRouter from './routes/audit';
+import handoverRouter from './routes/handover';
+import finesRouter from './routes/fines';
+import financeRouter from './routes/finance';
+import contractsRouter from './routes/contracts';
 
 export function createApp() {
   const app = express();
@@ -30,11 +34,15 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/admins', adminsRouter);
   app.use('/api/cars', carsRouter);
+  app.use('/api/bookings', handoverRouter);
   app.use('/api/bookings', bookingsRouter);
   app.use('/api/customers', customersRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/audit', auditRouter);
+  app.use('/api/fines', finesRouter);
+  app.use('/api', financeRouter);
+  app.use('/api', contractsRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });

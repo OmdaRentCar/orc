@@ -25,6 +25,12 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
   const [description, setDescription] = useState(car?.description ?? '');
   const [features, setFeatures] = useState((car?.features ?? []).join(', '));
   const [available, setAvailable] = useState(car?.available ?? true);
+  const [plateNumber, setPlateNumber] = useState(car?.plateNumber ?? '');
+  const [mileage, setMileage] = useState(String(car?.mileage ?? 0));
+  const [nextServiceKm, setNextServiceKm] = useState(car?.nextServiceKm ? String(car.nextServiceKm) : '');
+  const [insuranceExpiry, setInsuranceExpiry] = useState(car?.insuranceExpiry ?? '');
+  const [vignetteExpiry, setVignetteExpiry] = useState(car?.vignetteExpiry ?? '');
+  const [inspectionExpiry, setInspectionExpiry] = useState(car?.inspectionExpiry ?? '');
   const [imageUrl, setImageUrl] = useState(car?.image ?? '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [galleryKeep, setGalleryKeep] = useState<string[]>(car?.images ?? []);
@@ -53,6 +59,12 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
       fd.append('description', description);
       fd.append('features', features);
       fd.append('available', String(available));
+      fd.append('plateNumber', plateNumber.trim());
+      fd.append('mileage', mileage || '0');
+      fd.append('nextServiceKm', nextServiceKm);
+      fd.append('insuranceExpiry', insuranceExpiry);
+      fd.append('vignetteExpiry', vignetteExpiry);
+      fd.append('inspectionExpiry', inspectionExpiry);
 
       if (imageFile) {
         fd.append('image', imageFile);
@@ -205,6 +217,36 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
           <span className="text-xs text-brand-muted">Add photos (up to 8 per save)</span>
         </button>
       </div>
+
+      <fieldset className="rounded-xl border border-white/10 p-3 space-y-3">
+        <legend className="px-1 text-xs text-brand-muted">Papers and maintenance (you get alerts before they expire)</legend>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelClass} htmlFor="cf-plate">Plate number</label>
+            <input id="cf-plate" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="123 TU 4567" maxLength={30} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-km">Odometer (km)</label>
+            <input id="cf-km" type="number" min={0} value={mileage} onChange={(e) => setMileage(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-service">Next service at (km)</label>
+            <input id="cf-service" type="number" min={0} value={nextServiceKm} onChange={(e) => setNextServiceKm(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-ins">Insurance valid until</label>
+            <input id="cf-ins" type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-vig">Vignette valid until</label>
+            <input id="cf-vig" type="date" value={vignetteExpiry} onChange={(e) => setVignetteExpiry(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-insp">Technical inspection until</label>
+            <input id="cf-insp" type="date" value={inspectionExpiry} onChange={(e) => setInspectionExpiry(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+      </fieldset>
 
       <label className="flex items-center gap-2 cursor-pointer">
         <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} className="w-4 h-4 accent-brand-red" />

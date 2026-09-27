@@ -24,6 +24,7 @@ export default function CarPage() {
   }, [id]);
 
   const photos = car ? [car.image, ...car.images].filter((p): p is string => !!p) : [];
+  const available = !!car && car.available && !car.documentsExpired?.length;
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col">
@@ -69,8 +70,8 @@ export default function CarPage() {
               <p className="text-xs text-brand-muted uppercase tracking-[0.2em]"><bdi>{car.brand}</bdi></p>
               <h1 className="font-display text-5xl font-extrabold uppercase tracking-tight text-brand-text leading-none mt-1 mb-4"><bdi>{car.model}</bdi></h1>
               <div className="flex items-center gap-3 mb-6">
-                <span className={car.available ? 'badge-available' : 'badge-maintenance'}>
-                  ● {car.available ? t('card.available') : t('card.maintenance')}
+                <span className={available ? 'badge-available' : 'badge-maintenance'}>
+                  ● {available ? t('card.available') : t('card.maintenance')}
                 </span>
               </div>
               <p className="font-display text-4xl font-bold text-brand-red mb-8">
@@ -79,10 +80,10 @@ export default function CarPage() {
 
               <button
                 onClick={() => setBooking(true)}
-                disabled={!car.available}
+                disabled={!available}
                 className="w-full py-4 mb-10 text-xs font-semibold tracking-[0.2em] uppercase bg-brand-red text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {car.available ? t('card.bookNow') : t('card.unavailable')}
+                {available ? t('card.bookNow') : t('card.unavailable')}
               </button>
 
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-muted mb-3">{t('carPage.specs')}</h2>

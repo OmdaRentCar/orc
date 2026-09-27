@@ -14,6 +14,8 @@ const NAV = [
   { to: '/admin/calendar', label: 'Calendar', icon: '🗓️', end: false, ownerOnly: false },
   { to: '/admin/cars', label: 'Manage Cars', icon: '🚗', end: false, ownerOnly: false },
   { to: '/admin/customers', label: 'Customers', icon: '👥', end: false, ownerOnly: false },
+  { to: '/admin/fines', label: 'Fines', icon: '🚨', end: false, ownerOnly: false },
+  { to: '/admin/finances', label: 'Profit per Car', icon: '💹', end: false, ownerOnly: false },
   { to: '/admin/history', label: 'History', icon: '📜', end: false, ownerOnly: false },
   { to: '/admin/team', label: 'Team', icon: '🔑', end: false, ownerOnly: true },
   { to: '/admin/activity', label: 'Activity Log', icon: '🕓', end: false, ownerOnly: true },

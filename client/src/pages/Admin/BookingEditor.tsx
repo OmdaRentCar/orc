@@ -35,6 +35,7 @@ export default function BookingEditor({ open, booking, cars, onClose, onSaved }:
   const [status, setStatus] = useState<'approved' | 'pending'>('approved');
   const [locale, setLocale] = useState('en');
   const [notes, setNotes] = useState('');
+  const [driver, setDriver] = useState({ idNumber: '', licenseNumber: '', birthDate: '', licenseIssueDate: '', licenseExpiry: '', customerAddress: '' });
   const [quote, setQuote] = useState<Quote | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,6 +57,10 @@ export default function BookingEditor({ open, booking, cars, onClose, onSaved }:
     setStatus('approved');
     setLocale(booking?.locale ?? 'en');
     setNotes(booking?.notes ?? '');
+    setDriver({
+      idNumber: booking?.idNumber ?? '', licenseNumber: booking?.licenseNumber ?? '', birthDate: booking?.birthDate ?? '',
+      licenseIssueDate: booking?.licenseIssueDate ?? '', licenseExpiry: booking?.licenseExpiry ?? '', customerAddress: booking?.customerAddress ?? '',
+    });
   }, [open, booking, cars]);
 
   useEffect(() => {
@@ -97,6 +102,7 @@ export default function BookingEditor({ open, booking, cars, onClose, onSaved }:
       extras,
       notes: notes.trim() || null,
       locale,
+      ...Object.fromEntries(Object.entries(driver).map(([k, v]) => [k, v.trim() || undefined])),
       ...(isEdit ? {} : { status }),
     };
 
@@ -215,6 +221,25 @@ export default function BookingEditor({ open, booking, cars, onClose, onSaved }:
               </select>
             </div>
         </div>
+
+        <details className="rounded-xl border border-white/10 p-3" open={!!(driver.idNumber || driver.licenseNumber)}>
+          <summary className="cursor-pointer text-xs text-brand-muted">Driver details (printed on the contract)</summary>
+          <div className="grid sm:grid-cols-3 gap-3 mt-3">
+            {([
+              ['idNumber', 'CIN / passport', 'text'],
+              ['licenseNumber', 'Licence number', 'text'],
+              ['birthDate', 'Date of birth', 'date'],
+              ['licenseIssueDate', 'Licence issued on', 'date'],
+              ['licenseExpiry', 'Licence valid until', 'date'],
+              ['customerAddress', 'Address', 'text'],
+            ] as const).map(([key, label, type]) => (
+              <div key={key}>
+                <label className={labelClass} htmlFor={`be-${key}`}>{label}</label>
+                <input id={`be-${key}`} type={type} value={driver[key]} onChange={(e) => setDriver({ ...driver, [key]: e.target.value })} className={inputClass} />
+              </div>
+            ))}
+          </div>
+        </details>
 
         <div>
           <label className={labelClass} htmlFor="be-notes">Internal notes</label>

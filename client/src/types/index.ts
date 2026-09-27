@@ -13,8 +13,21 @@ export interface Car {
   transmission: string;
   description: string | null;
   features: string[];
+  plateNumber: string | null;
+  mileage: number;
+  insuranceExpiry: string | null;
+  vignetteExpiry: string | null;
+  inspectionExpiry: string | null;
+  nextServiceKm: number | null;
+  documentsExpired: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ExtraCharge {
+  label: string;
+  amount: number;
+  kind: 'km' | 'fuel' | 'late' | 'damage' | 'fine' | 'other';
 }
 
 export type BookingStatus = 'pending' | 'approved' | 'picked_up' | 'completed' | 'declined' | 'cancelled';
@@ -56,14 +69,110 @@ export interface Booking {
   locale: string;
   source: 'online' | 'admin';
   notes: string | null;
+  birthDate: string | null;
+  licenseNumber: string | null;
+  licenseIssueDate: string | null;
+  licenseExpiry: string | null;
+  idNumber: string | null;
+  customerAddress: string | null;
+  extraCharges: ExtraCharge[];
+  extraChargesTotal: number;
   createdAt: string;
   updatedAt: string;
   car?: { brand: string; model: string; image: string | null };
 }
 
+export interface Damage {
+  x: number;
+  y: number;
+  note?: string;
+}
+
+export interface Inspection {
+  id: number;
+  bookingId: number;
+  type: 'checkout' | 'checkin';
+  mileage: number;
+  fuelLevel: number;
+  damages: Damage[];
+  photos: { url: string; view: string; thumb: string }[];
+  signature: string | null;
+  signerName: string;
+  notes: string | null;
+  staffName: string;
+  createdAt: string;
+}
+
+export interface Fine {
+  id: number;
+  carId: number;
+  bookingId: number | null;
+  date: string;
+  time: string;
+  amount: number;
+  description: string | null;
+  status: 'open' | 'charged' | 'paid';
+  createdAt: string;
+  car: { brand: string; model: string; plateNumber: string | null };
+  booking: { reference: string; guestName: string; phone: string } | null;
+}
+
+export interface FineMatch {
+  id: number;
+  reference: string;
+  guestName: string;
+  phone: string;
+  email: string | null;
+  idNumber: string | null;
+  licenseNumber: string | null;
+  status: BookingStatus;
+  from: string;
+  to: string;
+  basedOn: 'handover' | 'booking';
+}
+
+export type ExpenseCategory = 'repair' | 'service' | 'tyres' | 'insurance' | 'documents' | 'cleaning' | 'other';
+
+export interface Expense {
+  id: number;
+  carId: number;
+  date: string;
+  category: ExpenseCategory;
+  amount: number;
+  note: string | null;
+  car: { brand: string; model: string; plateNumber: string | null };
+}
+
+export interface CarReport {
+  from: string;
+  to: string;
+  periodDays: number;
+  totals: { revenue: number; expenses: number; profit: number };
+  cars: {
+    carId: number;
+    car: string;
+    plateNumber: string | null;
+    bookings: number;
+    bookedDays: number;
+    utilization: number;
+    revenue: number;
+    expenses: number;
+    profit: number;
+    byCategory: Record<ExpenseCategory, number>;
+  }[];
+}
+
+export interface QuoteLine {
+  label: string;
+  days: number;
+  rate: number;
+  amount: number;
+}
+
 export interface Quote {
   days: number;
   dailyRate: number;
+  lines: QuoteLine[];
   subtotal: number;
   discountPct: number;
   discount: number;
@@ -90,6 +199,25 @@ export interface BusinessSettings {
   contactEmail: string;
   contactPhone: string;
   extras: Extra[];
+  weekendPct: number;
+  seasons: Season[];
+  kmPerDayIncluded: number;
+  extraKmPrice: number;
+  fuelChargePerEighth: number;
+  lateGraceHours: number;
+  minDriverAge: number;
+  minLicenseYears: number;
+  companyName: string;
+  companyAddress: string;
+  companyTaxId: string;
+  contractTerms: string;
+}
+
+export interface Season {
+  name: string;
+  from: string; // MM-DD
+  to: string;
+  pct: number;
 }
 
 export interface BookingStatusView {
@@ -112,6 +240,8 @@ export interface BookingStatusView {
   deposit: number;
   paymentStatus: PaymentStatus;
   amountPaid: number;
+  extraCharges: ExtraCharge[];
+  extraChargesTotal: number;
   createdAt: string;
 }
 
@@ -145,7 +275,11 @@ export interface DashboardStats {
   bookingByStatus: { status: string; count: number }[];
   carsByType: { type: string; count: number }[];
   carsByBrand: { brand: string; count: number }[];
-  upcoming: { id: number; reference: string; guestName: string; car: string; kind: 'pickup' | 'return'; date: string; time: string }[];
+  upcoming: { id: number; reference: string; guestName: string; phone: string; locale: string; car: string; kind: 'pickup' | 'return'; date: string; time: string }[];
+  alerts: { carId: number; car: string; kind: 'document' | 'service'; label: string; due: string; level: 'expired' | 'soon' | 'upcoming' }[];
+  lateReturns: { id: number; reference: string; guestName: string; phone: string; locale: string; car: string; due: string }[];
+  unpaid: { id: number; reference: string; guestName: string; phone: string; balance: number }[];
+  unpaidTotal: number;
   monthly: { month: string; bookings: number; revenue: number }[];
 }
 
