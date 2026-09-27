@@ -18,3 +18,6 @@ examplePage.html
 
 # Database backups (npm run backup) contain customer data
 server/backups/
+
+# Local dev server logs
+.logs/
