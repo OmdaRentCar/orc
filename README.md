@@ -42,7 +42,7 @@ Car rental website for Tunisia (prices in DT) with a 3D showcase, online booking
 | Storage | Cloudinary (car photos public, ID documents private) |
 | Real-time | Socket.io |
 | Monitoring | Sentry (optional) |
-| Deployment | Vercel (client) + Render (server) |
+| Deployment | Render (server) |
 
 ## Local Development
 
@@ -126,11 +126,6 @@ Backups contain customer data and are git-ignored; keep copies somewhere safe.
 4. **Start command:** `npm run start`
 5. Add the env vars from `.env.example` (set `CLIENT_URL` to your site's URL)
 6. After the first deploy, open the Render shell and run `npm run seed`
-
-### Frontend → Vercel
-
-1. Import the repo on [vercel.com](https://vercel.com), framework **Vite**, root directory `client`
-2. Add `VITE_API_BASE_URL=https://your-api.onrender.com` (and the optional `VITE_*` keys)
 
 ### Cloudinary
 
