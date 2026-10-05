@@ -52,7 +52,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <Link to="/" className="inline-block mb-4">
               <p className="font-display text-3xl font-extrabold text-brand-text">
-                Omda<span className="text-brand-red">.</span>
+                RentCar<span className="text-brand-red">.</span>
               </p>
             </Link>
             <h1 className="text-xl font-bold text-brand-text">Admin Access</h1>

@@ -12,10 +12,12 @@ server/dist/
 .DS_Store
 Thumbs.db
 
-# Large 3D assets (served via Cloudinary CDN)
+# Large 3D assets (served via Cloudinary CDN) & reference files
 client/public/models/*.glb
 examplePage.html
 
-# Large 3D assets & reference files
-client/public/models/porsche.glb
-examplePage.html
+# Database backups (npm run backup) contain customer data
+server/backups/
+
+# Local dev server logs
+.logs/

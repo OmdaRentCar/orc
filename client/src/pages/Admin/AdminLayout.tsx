@@ -1,22 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import NotificationsPanel from '../../components/layout/NotificationsPanel';
 import { ToastProvider } from '../../components/ui/Toast';
-import { joinAdmin } from '../../services/socket';
-import { useEffect } from 'react';
+import { joinAdmin, disconnectSocket } from '../../services/socket';
+import { apiJSON } from '../../services/api';
+import type { AdminUser } from '../../types';
 
 const NAV = [
-  { to: '/admin', label: 'Overview', icon: '📊', end: true },
-  { to: '/admin/bookings', label: 'Bookings', icon: '📋', end: false },
-  { to: '/admin/cars', label: 'Manage Cars', icon: '🚗', end: false },
-  { to: '/admin/history', label: 'History', icon: '📜', end: false },
-  { to: '/admin/settings', label: 'Settings', icon: '⚙️', end: false },
+  { to: '/admin', label: 'Overview', icon: '📊', end: true, ownerOnly: false },
+  { to: '/admin/bookings', label: 'Bookings', icon: '📋', end: false, ownerOnly: false },
+  { to: '/admin/calendar', label: 'Calendar', icon: '🗓️', end: false, ownerOnly: false },
+  { to: '/admin/cars', label: 'Manage Cars', icon: '🚗', end: false, ownerOnly: false },
+  { to: '/admin/customers', label: 'Customers', icon: '👥', end: false, ownerOnly: false },
+  { to: '/admin/fines', label: 'Fines', icon: '🚨', end: false, ownerOnly: false },
+  { to: '/admin/finances', label: 'Profit per Car', icon: '💹', end: false, ownerOnly: false },
+  { to: '/admin/history', label: 'History', icon: '📜', end: false, ownerOnly: false },
+  { to: '/admin/team', label: 'Team', icon: '🔑', end: false, ownerOnly: true },
+  { to: '/admin/activity', label: 'Activity Log', icon: '🕓', end: false, ownerOnly: true },
+  { to: '/admin/settings', label: 'Settings', icon: '⚙️', end: false, ownerOnly: false },
 ];
 
 function AdminSidebar({ onClose }: { onClose: () => void }) {
-  const { user, logout } = useAuth();
+  const { user, isOwner, logout } = useAuth();
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -28,20 +35,22 @@ function AdminSidebar({ onClose }: { onClose: () => void }) {
     <aside className="w-64 bg-brand-surface border-r border-white/5 flex flex-col h-full flex-shrink-0">
       <div className="p-6 border-b border-white/5">
         <p className="font-display text-xl font-extrabold text-brand-text">
-          Omda<span className="text-brand-red">.</span>
+          RentCar<span className="text-brand-red">.</span>
         </p>
-        <p className="text-xs text-brand-muted mt-1">{user?.username}</p>
+        <p className="text-xs text-brand-muted mt-1">
+          {user?.username} <span className="px-1.5 py-0.5 ms-1 rounded bg-white/5 text-[10px] uppercase tracking-wider">{user?.role}</span>
+        </p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {NAV.map(({ to, label, icon, end }) => (
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {NAV.filter((item) => !item.ownerOnly || isOwner).map(({ to, label, icon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-brand-red/10 text-brand-red border border-brand-red/20' : 'text-brand-muted hover:text-brand-text hover:bg-white/5'}`
+              `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-brand-red/10 text-brand-red border border-brand-red/20' : 'text-brand-muted hover:text-brand-text hover:bg-white/5'}`
             }
           >
             <span>{icon}</span>
@@ -64,23 +73,26 @@ function AdminSidebar({ onClose }: { onClose: () => void }) {
 }
 
 export default function AdminLayout() {
+  const { token, updateUser } = useAuth();
   const { unreadCount } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    joinAdmin();
-  }, []);
+    if (!token) return;
+    joinAdmin(token);
+    // Picks up role changes made by an owner, and the role for sessions from before roles existed
+    apiJSON<AdminUser>('/auth/me').then((me) => updateUser(token, me)).catch(() => {});
+    return () => disconnectSocket();
+  }, [token, updateUser]);
 
   return (
     <ToastProvider>
       <div className="flex h-screen bg-brand-dark overflow-hidden">
-        {/* Desktop sidebar */}
         <div className="hidden md:flex">
           <AdminSidebar onClose={() => {}} />
         </div>
 
-        {/* Mobile sidebar */}
         {sidebarOpen && (
           <>
             <div className="fixed inset-0 bg-black/60 z-30" onClick={() => setSidebarOpen(false)} />
@@ -95,14 +107,16 @@ export default function AdminLayout() {
             <button
               className="md:hidden text-brand-muted hover:text-brand-text transition-colors"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
             >
               ☰
             </button>
             <p className="text-xs text-brand-muted hidden md:block">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
             <button
               onClick={() => setNotifOpen(true)}
+              aria-label="Notifications"
               className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/5 transition-colors"
             >
               <span className="text-lg">🔔</span>

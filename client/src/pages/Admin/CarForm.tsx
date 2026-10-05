@@ -25,8 +25,17 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
   const [description, setDescription] = useState(car?.description ?? '');
   const [features, setFeatures] = useState((car?.features ?? []).join(', '));
   const [available, setAvailable] = useState(car?.available ?? true);
+  const [plateNumber, setPlateNumber] = useState(car?.plateNumber ?? '');
+  const [mileage, setMileage] = useState(String(car?.mileage ?? 0));
+  const [nextServiceKm, setNextServiceKm] = useState(car?.nextServiceKm ? String(car.nextServiceKm) : '');
+  const [insuranceExpiry, setInsuranceExpiry] = useState(car?.insuranceExpiry ?? '');
+  const [vignetteExpiry, setVignetteExpiry] = useState(car?.vignetteExpiry ?? '');
+  const [inspectionExpiry, setInspectionExpiry] = useState(car?.inspectionExpiry ?? '');
   const [imageUrl, setImageUrl] = useState(car?.image ?? '');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [galleryKeep, setGalleryKeep] = useState<string[]>(car?.images ?? []);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,12 +59,20 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
       fd.append('description', description);
       fd.append('features', features);
       fd.append('available', String(available));
+      fd.append('plateNumber', plateNumber.trim());
+      fd.append('mileage', mileage || '0');
+      fd.append('nextServiceKm', nextServiceKm);
+      fd.append('insuranceExpiry', insuranceExpiry);
+      fd.append('vignetteExpiry', vignetteExpiry);
+      fd.append('inspectionExpiry', inspectionExpiry);
 
       if (imageFile) {
         fd.append('image', imageFile);
-      } else if (imageUrl !== car?.image) {
+      } else if (imageUrl !== (car?.image ?? '')) {
         fd.append('image', imageUrl);
       }
+      if (isEdit) fd.append('gallery_keep', JSON.stringify(galleryKeep));
+      galleryFiles.forEach((f) => fd.append('gallery', f));
 
       const endpoint = isEdit ? `/cars/${car!.id}` : '/cars';
       const method = isEdit ? 'PUT' : 'POST';
@@ -104,7 +121,7 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
           <input type="number" value={year} onChange={(e) => setYear(e.target.value)} min={2000} max={2030} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Price/day ($) *</label>
+          <label className={labelClass}>Price/day (DT) *</label>
           <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} min={1} required className={inputClass} placeholder="299" />
         </div>
       </div>
@@ -158,6 +175,78 @@ export default function CarForm({ car, onSave, onCancel }: Props) {
           )}
         </div>
       </div>
+
+      <div>
+        <label className={labelClass}>Gallery photos (shown on the car page, up to 12)</label>
+        {(galleryKeep.length > 0 || galleryFiles.length > 0) && (
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
+            {galleryKeep.map((url) => (
+              <div key={url} className="relative aspect-[3/2] rounded-lg overflow-hidden bg-brand-elevated">
+                <img src={url} alt="" className="w-full h-full object-cover" />
+                <button type="button" onClick={() => setGalleryKeep((g) => g.filter((u) => u !== url))} aria-label="Remove photo" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-xs leading-none">×</button>
+              </div>
+            ))}
+            {galleryFiles.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="relative aspect-[3/2] rounded-lg overflow-hidden bg-brand-elevated flex items-center justify-center p-1">
+                <span className="text-[10px] text-brand-muted text-center break-all">{f.name}</span>
+                <button type="button" onClick={() => setGalleryFiles((g) => g.filter((_, j) => j !== i))} aria-label="Remove photo" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-xs leading-none">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={galleryKeep.length + galleryFiles.length >= 12}
+          className="w-full border border-dashed border-white/15 rounded-xl p-3 text-center cursor-pointer hover:border-brand-red/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={() => galleryRef.current?.click()}
+        >
+          <input
+            ref={galleryRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => {
+              // Copy the files before clearing the input: the FileList empties when the value is reset
+              const picked = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              const room = 12 - galleryKeep.length - galleryFiles.length;
+              setGalleryFiles((g) => [...g, ...picked.slice(0, Math.min(room, 8 - g.length))]);
+            }}
+          />
+          <span className="text-xs text-brand-muted">Add photos (up to 8 per save)</span>
+        </button>
+      </div>
+
+      <fieldset className="rounded-xl border border-white/10 p-3 space-y-3">
+        <legend className="px-1 text-xs text-brand-muted">Papers and maintenance (you get alerts before they expire)</legend>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelClass} htmlFor="cf-plate">Plate number</label>
+            <input id="cf-plate" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="123 TU 4567" maxLength={30} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-km">Odometer (km)</label>
+            <input id="cf-km" type="number" min={0} value={mileage} onChange={(e) => setMileage(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-service">Next service at (km)</label>
+            <input id="cf-service" type="number" min={0} value={nextServiceKm} onChange={(e) => setNextServiceKm(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-ins">Insurance valid until</label>
+            <input id="cf-ins" type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-vig">Vignette valid until</label>
+            <input id="cf-vig" type="date" value={vignetteExpiry} onChange={(e) => setVignetteExpiry(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="cf-insp">Technical inspection until</label>
+            <input id="cf-insp" type="date" value={inspectionExpiry} onChange={(e) => setInspectionExpiry(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+      </fieldset>
 
       <label className="flex items-center gap-2 cursor-pointer">
         <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} className="w-4 h-4 accent-brand-red" />

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../../i18n';
 
 export default function SplashScreen() {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(false), 500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setVisible(false), 500);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!visible) return null;
@@ -27,10 +29,10 @@ export default function SplashScreen() {
         ))}
       </div>
       <div className="relative text-center">
-        <h1 className="font-display text-6xl font-black uppercase tracking-tight text-brand-text">
-          Omda<span className="text-brand-red">.</span>
+        <h1 className="font-display text-6xl font-black uppercase tracking-tight text-brand-text" dir="ltr">
+          RentCar<span className="text-brand-red">.</span>
         </h1>
-        <p className="mt-2 text-brand-muted text-[11px] tracking-[0.3em] uppercase">Car Rental</p>
+        <p className="mt-2 text-brand-muted text-[11px] tracking-[0.3em] uppercase">{t('splash.tagline')}</p>
         <div className="mt-6 flex justify-center">
           <div className="w-8 h-px bg-brand-red animate-pulse" />
         </div>

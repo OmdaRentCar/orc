@@ -9,11 +9,13 @@ datasource db {
 }
 
 model AdminUser {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         String     @default("staff") // owner | staff
+  createdAt    DateTime   @default(now()) @map("created_at")
+  auditLogs    AuditLog[]
 
   @@map("admin_users")
 }
@@ -26,15 +28,24 @@ model Car {
   year         Int
   price        Float
   image        String?
+  images       String[]  @default([]) // extra gallery photos, shown on the car page
   available    Boolean   @default(true)
   seats        Int       @default(5)
   fuel         String    @default("Petrol")
   transmission String    @default("Auto")
   description  String?
   features     String[]  @default([])
+  plateNumber        String?   @map("plate_number")
+  mileage            Int       @default(0) // current odometer, km
+  insuranceExpiry    String?   @map("insurance_expiry") // YYYY-MM-DD
+  vignetteExpiry     String?   @map("vignette_expiry")
+  inspectionExpiry   String?   @map("inspection_expiry") // visite technique
+  nextServiceKm      Int?      @map("next_service_km")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   bookings     Booking[]
+  fines        Fine[]
+  expenses     Expense[]
 
   @@index([brand])
   @@index([type])
@@ -42,23 +53,57 @@ model Car {
 }
 
 model Booking {
-  id            Int            @id @default(autoincrement())
-  carId         Int            @map("car_id")
-  guestName     String         @map("guest_name")
-  phone         String
-  email         String?
-  startDate     String         @map("start_date")
-  endDate       String         @map("end_date")
-  status        String         @default("pending")
-  documentImage String?        @map("document_image")
-  total         Float
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  car           Car            @relation(fields: [carId], references: [id], onDelete: Cascade)
-  notifications Notification[]
+  id              Int            @id @default(autoincrement())
+  reference       String         @unique // shown to the customer, used on the status page
+  carId           Int            @map("car_id")
+  guestName       String         @map("guest_name")
+  phone           String
+  email           String?
+  startDate       String         @map("start_date")
+  endDate         String         @map("end_date")
+  pickupTime      String         @default("10:00") @map("pickup_time")
+  returnTime      String         @default("10:00") @map("return_time")
+  deliveryType    String         @default("agency") @map("delivery_type") // agency | delivery
+  deliveryAddress String?        @map("delivery_address")
+  // pending -> approved -> picked_up -> completed; or declined / cancelled
+  status          String         @default("pending")
+  documentImage   String?        @map("document_image")
+  extras          Json           @default("[]")
+  subtotal        Float          @default(0)
+  discount        Float          @default(0)
+  extrasTotal     Float          @default(0) @map("extras_total")
+  deliveryFee     Float          @default(0) @map("delivery_fee")
+  total           Float
+  deposit         Float          @default(0)
+  paymentStatus   String         @default("unpaid") @map("payment_status") // unpaid | deposit | paid
+  amountPaid      Float          @default(0) @map("amount_paid")
+  locale          String         @default("en") // language used for customer emails
+  source          String         @default("online") // online | admin
+  notes           String?
+  // Driver details (checked against the minimum age / licence years, printed on the contract)
+  birthDate          String?  @map("birth_date")
+  licenseNumber      String?  @map("license_number")
+  licenseIssueDate   String?  @map("license_issue_date")
+  licenseExpiry      String?  @map("license_expiry")
+  idNumber           String?  @map("id_number") // CIN or passport
+  customerAddress    String?  @map("customer_address")
+  // Charges added after the booking: extra km, fuel, late return, damage, fines
+  extraCharges       Json     @default("[]") @map("extra_charges")
+  extraChargesTotal  Float    @default(0) @map("extra_charges_total")
+  pickupReminderSent Boolean  @default(false) @map("pickup_reminder_sent")
+  returnReminderSent Boolean  @default(false) @map("return_reminder_sent")
+  lateNotified       Boolean  @default(false) @map("late_notified")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  car             Car            @relation(fields: [carId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+  inspections     Inspection[]
+  fines           Fine[]
+  onlineContract  OnlineContract?
 
   @@index([carId, status, startDate, endDate])
   @@index([createdAt])
+  @@index([phone])
   @@map("bookings")
 }
 
@@ -74,4 +119,126 @@ model Notification {
   @@index([createdAt])
   @@index([read])
   @@map("notifications")
+}
+
+// Single row (id = 1) holding pricing and business options editable from the admin Settings page
+model BusinessSettings {
+  id        Int      @id @default(1)
+  data      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("business_settings")
+}
+
+model BlockedCustomer {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique // digits only, see normalizePhone()
+  name      String?
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("blocked_customers")
+}
+
+model AuditLog {
+  id        Int        @id @default(autoincrement())
+  adminId   Int?       @map("admin_id")
+  username  String
+  action    String
+  entity    String
+  entityId  Int?       @map("entity_id")
+  details   String?
+  createdAt DateTime   @default(now()) @map("created_at")
+  admin     AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Car handover: one at pick-up ("checkout") and one at return ("checkin")
+model Inspection {
+  id          Int      @id @default(autoincrement())
+  bookingId   Int      @map("booking_id")
+  type        String // checkout | checkin
+  mileage     Int
+  fuelLevel   Int      @map("fuel_level") // eighths of a tank, 0-8
+  damages     Json     @default("[]") // [{ x, y, note }] on the car outline, 0-100
+  photos      String[] @default([]) // private Cloudinary URLs
+  signature   String? // private Cloudinary URL of the customer's signature
+  signerName  String   @map("signer_name")
+  notes       String?
+  staffName   String   @map("staff_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, type])
+  @@map("inspections")
+}
+
+model Fine {
+  id          Int      @id @default(autoincrement())
+  carId       Int      @map("car_id")
+  bookingId   Int?     @map("booking_id")
+  date        String // YYYY-MM-DD of the offence
+  time        String // HH:MM
+  amount      Float
+  description String?
+  status      String   @default("open") // open | charged | paid
+  createdAt   DateTime @default(now()) @map("created_at")
+  car         Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  booking     Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([carId, date])
+  @@map("fines")
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  carId     Int      @map("car_id")
+  date      String // YYYY-MM-DD
+  category  String // repair | service | tyres | insurance | documents | cleaning | other
+  amount    Float
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId, date])
+  @@map("expenses")
+}
+
+// Remembers which automatic alerts were already sent, so each one goes out once
+model AlertLog {
+  key       String   @id
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("alert_logs")
+}
+
+// Contract signed remotely by the customer: link by email, one-time code, drawn signature,
+// then a frozen PDF whose SHA-256 fingerprint proves it was never changed afterwards
+model OnlineContract {
+  id               Int       @id @default(autoincrement())
+  bookingId        Int       @unique @map("booking_id")
+  tokenHash        String    @unique @map("token_hash") // SHA-256 of the link token; the token itself is never stored
+  expiresAt        DateTime  @map("expires_at")
+  sentAt           DateTime  @default(now()) @map("sent_at")
+  sentBy           String    @map("sent_by") // staff member who issued it on behalf of the agency
+  otpHash          String?   @map("otp_hash")
+  otpExpiresAt     DateTime? @map("otp_expires_at")
+  otpAttempts      Int       @default(0) @map("otp_attempts")
+  otpSentCount     Int       @default(0) @map("otp_sent_count")
+  otpLastSentAt    DateTime? @map("otp_last_sent_at")
+  viewedAt         DateTime? @map("viewed_at")
+  signedAt         DateTime? @map("signed_at")
+  signerName       String?   @map("signer_name")
+  signerIp         String?   @map("signer_ip")
+  signerUserAgent  String?   @map("signer_user_agent")
+  signature        String? // private Cloudinary image
+  pdfUrl           String?   @map("pdf_url") // private Cloudinary copy of the signed PDF, never regenerated
+  documentHash     String?   @map("document_hash") // SHA-256 of the signed PDF
+  verificationCode String?   @unique @map("verification_code")
+  revokedAt        DateTime? @map("revoked_at")
+  booking          Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("online_contracts")
 }
