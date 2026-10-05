@@ -4,6 +4,7 @@ import http from 'http';
 import { createApp } from './app';
 import { initSocket } from './socket';
 import { startJobs } from './services/jobs';
+import { ensurePlatformAdmin } from './services/platformAdmin';
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET env var is required');
@@ -16,5 +17,6 @@ initSocket(server);
 const PORT = parseInt(process.env.PORT || '4000', 10);
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  ensurePlatformAdmin().catch((err) => console.error('[PLATFORM] Could not create the console account:', err.message));
   startJobs();
 });

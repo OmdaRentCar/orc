@@ -2,12 +2,15 @@ import { useLocation } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 import { useBusinessSettings } from '../../services/settings';
 import { whatsappUrl } from '../../utils/format';
+import { useAgency } from '../../context/AgencyContext';
 
 // Floating chat button; hidden until a WhatsApp number is set in the admin Settings page
 export default function WhatsAppButton() {
   const { t } = useI18n();
   const settings = useBusinessSettings();
   const { pathname } = useLocation();
+  const { agency } = useAgency();
+  if (agency.isPlatform) return null; // the general page belongs to no single agency
   // Hidden while signing: on a phone it would cover the "Sign" button
   if (!settings?.whatsappNumber || pathname.startsWith('/sign/')) return null;
 

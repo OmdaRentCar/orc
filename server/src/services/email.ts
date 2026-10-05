@@ -1,6 +1,7 @@
-import nodemailer from 'nodemailer';
+import { deliver, emailProvider } from './mailer';
+import { getSettings } from './settings';
 
-export type EmailKind = 'received' | 'approved' | 'declined' | 'cancelled' | 'pickup_reminder' | 'return_reminder' | 'contract' | 'return_report' | 'sign_request' | 'sign_code' | 'contract_signed';
+export type EmailKind = 'received' | 'approved' | 'declined' | 'cancelled' | 'pickup_reminder' | 'return_reminder' | 'contract' | 'return_report' | 'sign_request' | 'sign_code' | 'contract_signed' | 'contract_copy';
 export type Locale = 'en' | 'fr' | 'ar';
 
 export interface BookingEmailData {
@@ -16,7 +17,10 @@ export interface BookingEmailData {
   locale: string;
 }
 
-const BRAND = process.env.BRAND_NAME || 'RentCar';
+import { agencySiteUrl, currentAgency } from '../lib/tenant';
+
+// Emails go out under the agency's own name
+const brand = () => currentAgency()?.name ?? process.env.BRAND_NAME ?? 'RentCar';
 
 const TEXT: Record<Locale, {
   subject: Record<EmailKind, string>;
@@ -40,8 +44,9 @@ const TEXT: Record<Locale, {
       sign_request: 'Please sign your rental contract {ref}',
       sign_code: 'Your signature code: {code}',
       contract_signed: 'Signed contract {ref} - {car}',
+      contract_copy: 'Your rental contract {ref} - {car}',
     },
-    heading: { received: 'Request received', approved: 'Booking confirmed!', declined: 'Booking declined', cancelled: 'Booking cancelled', pickup_reminder: 'See you tomorrow!', return_reminder: 'Return due today', contract: 'Enjoy your drive!', return_report: 'Car returned', sign_request: 'Your contract is ready', sign_code: 'Signature code', contract_signed: 'Contract signed' },
+    heading: { received: 'Request received', approved: 'Booking confirmed!', declined: 'Booking declined', cancelled: 'Booking cancelled', pickup_reminder: 'See you tomorrow!', return_reminder: 'Return due today', contract: 'Enjoy your drive!', return_report: 'Car returned', sign_request: 'Your contract is ready', sign_code: 'Signature code', contract_signed: 'Contract signed', contract_copy: 'Your rental contract' },
     intro: {
       received: 'Thank you {name}! We received your booking request. Our team will review it and confirm shortly.',
       approved: 'Good news {name}, your rental is confirmed. See you at pick-up!',
@@ -54,6 +59,7 @@ const TEXT: Record<Locale, {
       sign_request: 'Hello {name}, your rental contract is ready. Read it and sign it online from your phone: it only takes a minute, and saves time at pick-up. The link is personal and valid for 7 days.',
       sign_code: 'Enter this code on the signing page to confirm it is you. It is valid for 10 minutes. If you did not ask for it, ignore this email.',
       contract_signed: 'Thank you {name}, your contract is signed. The signed PDF is attached: keep it. Its authenticity can be checked at any time with the verification code printed on it.',
+      contract_copy: 'Hello {name}, please find your rental contract attached. Keep it with you during the rental, and contact us if anything is not right.',
     },
     labels: { reference: 'Reference', car: 'Car', pickup: 'Pick-up', return: 'Return', total: 'Total', deposit: 'Deposit' },
     checkStatus: 'Check booking status',
@@ -73,8 +79,9 @@ const TEXT: Record<Locale, {
       sign_request: 'Merci de signer votre contrat de location {ref}',
       sign_code: 'Votre code de signature : {code}',
       contract_signed: 'Contrat signé {ref} - {car}',
+      contract_copy: 'Votre contrat de location {ref} - {car}',
     },
-    heading: { received: 'Demande reçue', approved: 'Réservation confirmée !', declined: 'Réservation refusée', cancelled: 'Réservation annulée', pickup_reminder: 'À demain !', return_reminder: 'Retour prévu aujourd’hui', contract: 'Bonne route !', return_report: 'Véhicule restitué', sign_request: 'Votre contrat est prêt', sign_code: 'Code de signature', contract_signed: 'Contrat signé' },
+    heading: { received: 'Demande reçue', approved: 'Réservation confirmée !', declined: 'Réservation refusée', cancelled: 'Réservation annulée', pickup_reminder: 'À demain !', return_reminder: 'Retour prévu aujourd’hui', contract: 'Bonne route !', return_report: 'Véhicule restitué', sign_request: 'Votre contrat est prêt', sign_code: 'Code de signature', contract_signed: 'Contrat signé', contract_copy: 'Votre contrat de location' },
     intro: {
       received: 'Merci {name} ! Nous avons bien reçu votre demande. Notre équipe va l’examiner et vous confirmer rapidement.',
       approved: 'Bonne nouvelle {name}, votre location est confirmée. À bientôt !',
@@ -87,6 +94,7 @@ const TEXT: Record<Locale, {
       sign_request: 'Bonjour {name}, votre contrat de location est prêt. Lisez-le et signez-le en ligne depuis votre téléphone : cela prend une minute et vous fait gagner du temps au départ. Le lien est personnel et valable 7 jours.',
       sign_code: 'Saisissez ce code sur la page de signature pour confirmer votre identité. Il est valable 10 minutes. Si vous ne l’avez pas demandé, ignorez cet e-mail.',
       contract_signed: 'Merci {name}, votre contrat est signé. Le PDF signé est en pièce jointe : conservez-le. Son authenticité peut être vérifiée à tout moment grâce au code de vérification imprimé dessus.',
+      contract_copy: 'Bonjour {name}, vous trouverez votre contrat de location en pièce jointe. Gardez-le avec vous pendant la location et contactez-nous si quelque chose ne va pas.',
     },
     labels: { reference: 'Référence', car: 'Véhicule', pickup: 'Prise en charge', return: 'Retour', total: 'Total', deposit: 'Caution' },
     checkStatus: 'Voir le statut de la réservation',
@@ -106,8 +114,9 @@ const TEXT: Record<Locale, {
       sign_request: 'يرجى توقيع عقد الكراء {ref}',
       sign_code: 'رمز التوقيع: {code}',
       contract_signed: 'العقد الموقّع {ref} - {car}',
+      contract_copy: 'عقد الكراء {ref} - {car}',
     },
-    heading: { received: 'تم استلام الطلب', approved: 'تم تأكيد الحجز!', declined: 'تم رفض الحجز', cancelled: 'تم إلغاء الحجز', pickup_reminder: 'نراك غدًا!', return_reminder: 'موعد الإرجاع اليوم', contract: 'رحلة سعيدة!', return_report: 'تم إرجاع السيارة', sign_request: 'عقدك جاهز', sign_code: 'رمز التوقيع', contract_signed: 'تم توقيع العقد' },
+    heading: { received: 'تم استلام الطلب', approved: 'تم تأكيد الحجز!', declined: 'تم رفض الحجز', cancelled: 'تم إلغاء الحجز', pickup_reminder: 'نراك غدًا!', return_reminder: 'موعد الإرجاع اليوم', contract: 'رحلة سعيدة!', return_report: 'تم إرجاع السيارة', sign_request: 'عقدك جاهز', sign_code: 'رمز التوقيع', contract_signed: 'تم توقيع العقد', contract_copy: 'عقد الكراء' },
     intro: {
       received: 'شكرًا {name}! استلمنا طلب الحجز الخاص بك، وسيقوم فريقنا بمراجعته وتأكيده قريبًا.',
       approved: 'خبر سار {name}، تم تأكيد الإيجار. نراك عند الاستلام!',
@@ -120,6 +129,7 @@ const TEXT: Record<Locale, {
       sign_request: 'مرحبًا {name}، عقد الكراء جاهز. اقرأه ووقّعه عبر الإنترنت من هاتفك: الأمر يستغرق دقيقة ويوفّر عليك الوقت عند الاستلام. الرابط شخصي وصالح لمدة 7 أيام.',
       sign_code: 'أدخل هذا الرمز في صفحة التوقيع لتأكيد هويتك. الرمز صالح لمدة 10 دقائق. إذا لم تطلبه، تجاهل هذه الرسالة.',
       contract_signed: 'شكرًا {name}، تم توقيع عقدك. تجد العقد الموقّع في المرفقات، احتفظ به. يمكن التحقق من صحته في أي وقت بواسطة رمز التحقق المطبوع عليه.',
+      contract_copy: 'مرحبًا {name}، تجد عقد الكراء في المرفقات. احتفظ به طوال مدة الكراء وتواصل معنا إذا كان هناك أي خطأ.',
     },
     labels: { reference: 'المرجع', car: 'السيارة', pickup: 'الاستلام', return: 'الإرجاع', total: 'المجموع', deposit: 'التأمين' },
     checkStatus: 'متابعة حالة الحجز',
@@ -131,7 +141,7 @@ const TEXT: Record<Locale, {
 const ACCENT: Record<EmailKind, string> = {
   received: '#e8eaea', approved: '#22c55e', declined: '#e72526', cancelled: '#f59e0b',
   pickup_reminder: '#e8eaea', return_reminder: '#f59e0b', contract: '#22c55e', return_report: '#e8eaea',
-  sign_request: '#e8eaea', sign_code: '#e8eaea', contract_signed: '#22c55e',
+  sign_request: '#e8eaea', sign_code: '#e8eaea', contract_signed: '#22c55e', contract_copy: '#e8eaea',
 };
 
 function fill(text: string, vars: Record<string, string>): string {
@@ -142,30 +152,18 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-function getTransporter() {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'ssl0.ovh.net',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user, pass },
-  });
-}
-
 interface TemplateOptions {
   actionUrl?: string; // replaces the status-page button
   code?: string; // shown large (one-time codes)
   bcc?: string; // silent copy, e.g. the agency's copy of a signed contract
 }
 
-function template(kind: EmailKind, b: BookingEmailData, locale: Locale, opts: TemplateOptions = {}): string {
+function template(kind: EmailKind, b: BookingEmailData, locale: Locale, opts: TemplateOptions = {}, contact = 'contact@example.com'): string {
   const t = TEXT[locale];
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   const align = locale === 'ar' ? 'left' : 'right';
-  const statusUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/booking-status?ref=${encodeURIComponent(b.reference)}`;
-  const contact = process.env.SMTP_USER || 'contact@example.com';
+  const BRAND = escapeHtml(brand());
+  const statusUrl = `${agencySiteUrl()}/booking-status?ref=${encodeURIComponent(b.reference)}`;
   const row = (label: string, value: string, strong = false) => `
     <tr><td style="padding:12px 0;color:#848c88;border-bottom:1px solid rgba(255,255,255,0.04);">${label}</td>
     <td style="padding:12px 0;text-align:${align};font-weight:${strong ? 700 : 600};color:${strong ? '#e72526' : '#e8eaea'};${strong ? 'font-size:20px;' : ''}border-bottom:1px solid rgba(255,255,255,0.04);">${value}</td></tr>`;
@@ -214,22 +212,25 @@ export interface EmailAttachment {
 }
 
 export async function sendBookingEmail(kind: EmailKind, to: string | null | undefined, booking: BookingEmailData, attachments: EmailAttachment[] = [], opts: TemplateOptions = {}): Promise<boolean> {
-  const transporter = getTransporter();
-  if (!to || !transporter) {
+  if (!to || !emailProvider()) {
     console.log(`[EMAIL] Skipped (${kind}): ${booking.reference} -> ${to || 'no email'}`);
     return false;
   }
   const locale: Locale = (['en', 'fr', 'ar'] as const).includes(booking.locale as Locale) ? (booking.locale as Locale) : 'en';
   try {
-    const info = await transporter.sendMail({
-      from: `"${BRAND}" <${process.env.SMTP_USER}>`,
+    // Customers reply to the agency itself, not to the platform's sending address
+    const own = (await getSettings()).contactEmail;
+    const contact = own && !own.endsWith('@example.com') ? own : process.env.SMTP_USER || 'contact@example.com';
+    const id = await deliver({
+      fromName: brand(),
       to,
+      replyTo: contact,
       subject: fill(TEXT[locale].subject[kind], { ref: booking.reference, car: booking.car, code: opts.code ?? '' }),
-      html: template(kind, booking, locale, opts),
+      html: template(kind, booking, locale, opts, contact),
       bcc: opts.bcc,
-      attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: 'application/pdf' })),
+      attachments,
     });
-    console.log(`[EMAIL] Sent (${kind}, ${locale}) ${booking.reference} to ${to} · id ${info.messageId}`);
+    console.log(`[EMAIL] Sent (${kind}, ${locale}) ${booking.reference} to ${to} · id ${id}`);
     return true;
   } catch (err: unknown) {
     console.error(`[EMAIL] Failed (${kind}) ${booking.reference} to ${to}:`, (err as Error).message);
@@ -239,18 +240,17 @@ export async function sendBookingEmail(kind: EmailKind, to: string | null | unde
 
 // Plain internal email to the agency (car alerts)
 export async function sendAdminEmail(to: string, subject: string, lines: string[]): Promise<boolean> {
-  const transporter = getTransporter();
   const recipient = to && !to.endsWith('@example.com') ? to : process.env.SMTP_USER;
-  if (!transporter || !recipient) {
+  if (!emailProvider() || !recipient) {
     console.log(`[EMAIL] Skipped (admin): ${subject}`);
     return false;
   }
   try {
-    await transporter.sendMail({
-      from: `"${BRAND}" <${process.env.SMTP_USER}>`,
+    await deliver({
+      fromName: brand(),
       to: recipient,
-      subject: `[${BRAND}] ${subject}`,
-      html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(subject)}</h2><ul>${lines.map((l) => `<li style="margin:6px 0">${escapeHtml(l)}</li>`).join('')}</ul><p style="color:#777;font-size:12px">Sent automatically by ${BRAND}.</p></div>`,
+      subject: `[${brand()}] ${subject}`,
+      html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(subject)}</h2><ul>${lines.map((l) => `<li style="margin:6px 0">${escapeHtml(l)}</li>`).join('')}</ul><p style="color:#777;font-size:12px">Sent automatically by ${escapeHtml(brand())}.</p></div>`,
     });
     console.log(`[EMAIL] Sent (admin) "${subject}" to ${recipient}`);
     return true;

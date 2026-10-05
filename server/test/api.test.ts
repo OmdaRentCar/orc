@@ -3,6 +3,7 @@ import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import { createApp } from '../src/app';
 import prisma from '../src/lib/prisma';
+import { asMain } from './agency';
 import { addDaysISO, todayISO } from '../src/lib/dates';
 
 const app = createApp();
@@ -24,12 +25,12 @@ function publicBooking(fields: Record<string, string>) {
 
 beforeAll(async () => {
   const passwordHash = await bcrypt.hash(PASSWORD, 4);
-  await prisma.adminUser.createMany({
+  await asMain(() => prisma.adminUser.createMany({
     data: [
       { username: 'owner', email: 'owner@test.local', passwordHash, role: 'owner' },
       { username: 'staff', email: 'staff@test.local', passwordHash, role: 'staff' },
     ],
-  });
+  }));
   ownerToken = (await request(app).post('/api/auth/login').send({ username: 'owner', password: PASSWORD })).body.token;
   staffToken = (await request(app).post('/api/auth/login').send({ username: 'staff', password: PASSWORD })).body.token;
 });

@@ -100,7 +100,7 @@ router.post('/:id/inspections', authMiddleware, uploadHandoverPhotos, async (req
       if (uploaded.length < 4) throw new HttpError(400, 'Take at least 4 photos (front, back and both sides)');
     }
 
-    signatureUrl = await uploadPrivateImage(input.signature, 'rentcar/handover');
+    signatureUrl = await uploadPrivateImage(input.signature, 'handover');
     const now = new Date();
 
     const newCharges: ExtraCharge[] = input.type === 'checkin'

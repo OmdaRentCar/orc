@@ -27,6 +27,7 @@ vi.stubGlobal('fetch', async () => ({ ok: false }));
 
 const { createApp } = await import('../src/app');
 const { default: prisma } = await import('../src/lib/prisma');
+const { asMain } = await import('./agency');
 const { addDaysISO, todayISO } = await import('../src/lib/dates');
 const { returnCharges } = await import('../src/services/handover');
 const { runReminders, runCarAlerts } = await import('../src/services/jobs');
@@ -66,10 +67,11 @@ async function setSettings(patch: Record<string, unknown>) {
 }
 
 beforeAll(async () => {
-  await prisma.adminUser.upsert({
-    where: { username: 'ops-owner' },
-    create: { username: 'ops-owner', email: 'ops-owner@test.local', role: 'owner', passwordHash: await bcrypt.hash('ops-password-1', 4) },
-    update: {},
+  const passwordHash = await bcrypt.hash('ops-password-1', 4);
+  await asMain(async () => {
+    if (!await prisma.adminUser.findFirst({ where: { username: 'ops-owner' } })) {
+      await prisma.adminUser.create({ data: { username: 'ops-owner', email: 'ops-owner@test.local', role: 'owner', passwordHash } });
+    }
   });
   token = (await request(app).post('/api/auth/login').send({ username: 'ops-owner', password: 'ops-password-1' })).body.token;
 });
@@ -77,7 +79,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await request(app).put('/api/settings').set(auth()).send(DEFAULT_SETTINGS);
   // The other test file checks "at least one owner" rules, so leave no extra owner behind
-  await prisma.adminUser.delete({ where: { username: 'ops-owner' } });
+  await asMain(() => prisma.adminUser.deleteMany({ where: { username: 'ops-owner' } }));
   await prisma.$disconnect();
 });
 
@@ -151,8 +153,8 @@ describe('car documents', () => {
 
   it('sends each document alert once', async () => {
     await newCar({ inspectionExpiry: day(5) });
-    expect(await runCarAlerts()).toBeGreaterThan(0);
-    expect(await runCarAlerts()).toBe(0);
+    expect(await asMain(runCarAlerts)).toBeGreaterThan(0);
+    expect(await asMain(runCarAlerts)).toBe(0);
   });
 });
 
@@ -272,14 +274,14 @@ describe('automatic reminders', () => {
     const late = await adminBooking(car.id, day(-3), day(-1));
     await request(app).put(`/api/bookings/${late.id}/status`).set(auth()).send({ status: 'picked_up' });
 
-    const first = await runReminders();
+    const first = await asMain(() => runReminders());
     expect(first.pickup).toBeGreaterThanOrEqual(1);
     expect(first.late).toBeGreaterThanOrEqual(1);
-    const [s, l] = await Promise.all([prisma.booking.findUnique({ where: { id: soon.id } }), prisma.booking.findUnique({ where: { id: late.id } })]);
+    const [s, l] = await asMain(() => Promise.all([prisma.booking.findUnique({ where: { id: soon.id } }), prisma.booking.findUnique({ where: { id: late.id } })]));
     expect(s?.pickupReminderSent).toBe(true);
     expect(l?.lateNotified).toBe(true);
 
-    const second = await runReminders();
+    const second = await asMain(() => runReminders());
     expect(second.pickup).toBe(0);
     expect(second.late).toBe(0);
   });

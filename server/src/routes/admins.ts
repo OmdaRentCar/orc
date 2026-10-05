@@ -5,6 +5,7 @@ import prisma from '../lib/prisma';
 import { HttpError, parseBody, parseId } from '../lib/http';
 import { authMiddleware, requireOwner } from '../middleware/auth';
 import { audit } from '../services/audit';
+import { requireRoom } from '../lib/plans';
 
 // Team management: owners add, change and remove admin accounts
 const router = Router();
@@ -35,6 +36,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
 
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   const input = parseBody(createSchema, req.body);
+  requireRoom('users', await prisma.adminUser.count());
   const clash = await prisma.adminUser.findFirst({ where: { OR: [{ username: input.username }, { email: input.email }] } });
   if (clash) throw new HttpError(409, clash.username === input.username ? 'Username already taken' : 'Email already in use');
 

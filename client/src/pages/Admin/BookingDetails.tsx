@@ -6,9 +6,10 @@ import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { apiJSON, openAuthedPdf } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
-import OnlineContractPanel from './OnlineContractPanel';
+import ContractManager, { ContractBadge } from './ContractManager';
 import type { Booking, BookingStatus, PaymentStatus } from '../../types';
 import { money, whatsappUrl } from '../../utils/format';
+import { brandName } from '../../services/agency';
 
 interface Props {
   booking: Booking | null;
@@ -39,22 +40,22 @@ const ACTIONS: Record<BookingStatus, { to: BookingStatus; label: string; style: 
 // WhatsApp message in the language the customer booked in
 const MESSAGES: Record<string, Partial<Record<BookingStatus, string>> & { default: string }> = {
   en: {
-    default: 'Hello {name}, this is RentCar about your booking {ref} ({car}, {start} → {end}).',
-    approved: 'Hello {name}, your booking {ref} for the {car} is confirmed: pick-up {start} at {time}. See you soon! — RentCar',
-    declined: 'Hello {name}, unfortunately we cannot accept booking {ref} for the {car}. Reply here and we will find another option. — RentCar',
-    pending: 'Hello {name}, we received your booking {ref} for the {car} and will confirm it shortly. — RentCar',
+    default: 'Hello {name}, this is {brand} about your booking {ref} ({car}, {start} → {end}).',
+    approved: 'Hello {name}, your booking {ref} for the {car} is confirmed: pick-up {start} at {time}. See you soon! — {brand}',
+    declined: 'Hello {name}, unfortunately we cannot accept booking {ref} for the {car}. Reply here and we will find another option. — {brand}',
+    pending: 'Hello {name}, we received your booking {ref} for the {car} and will confirm it shortly. — {brand}',
   },
   fr: {
-    default: 'Bonjour {name}, ici RentCar au sujet de votre réservation {ref} ({car}, {start} → {end}).',
-    approved: 'Bonjour {name}, votre réservation {ref} pour la {car} est confirmée : prise en charge le {start} à {time}. À bientôt ! — RentCar',
-    declined: "Bonjour {name}, nous ne pouvons malheureusement pas accepter la réservation {ref} pour la {car}. Répondez-nous et nous trouverons une autre solution. — RentCar",
-    pending: 'Bonjour {name}, nous avons bien reçu votre réservation {ref} pour la {car} et la confirmerons rapidement. — RentCar',
+    default: 'Bonjour {name}, ici {brand} au sujet de votre réservation {ref} ({car}, {start} → {end}).',
+    approved: 'Bonjour {name}, votre réservation {ref} pour la {car} est confirmée : prise en charge le {start} à {time}. À bientôt ! — {brand}',
+    declined: "Bonjour {name}, nous ne pouvons malheureusement pas accepter la réservation {ref} pour la {car}. Répondez-nous et nous trouverons une autre solution. — {brand}",
+    pending: 'Bonjour {name}, nous avons bien reçu votre réservation {ref} pour la {car} et la confirmerons rapidement. — {brand}',
   },
   ar: {
-    default: 'مرحبًا {name}، معك RentCar بخصوص حجزك {ref} ({car}، {start} ← {end}).',
-    approved: 'مرحبًا {name}، تم تأكيد حجزك {ref} للسيارة {car}: الاستلام يوم {start} على الساعة {time}. نراك قريبًا! — RentCar',
-    declined: 'مرحبًا {name}، للأسف لا يمكننا قبول الحجز {ref} للسيارة {car}. راسلنا هنا وسنجد لك حلًا آخر. — RentCar',
-    pending: 'مرحبًا {name}، استلمنا حجزك {ref} للسيارة {car} وسنؤكده قريبًا. — RentCar',
+    default: 'مرحبًا {name}، معك {brand} بخصوص حجزك {ref} ({car}، {start} ← {end}).',
+    approved: 'مرحبًا {name}، تم تأكيد حجزك {ref} للسيارة {car}: الاستلام يوم {start} على الساعة {time}. نراك قريبًا! — {brand}',
+    declined: 'مرحبًا {name}، للأسف لا يمكننا قبول الحجز {ref} للسيارة {car}. راسلنا هنا وسنجد لك حلًا آخر. — {brand}',
+    pending: 'مرحبًا {name}، استلمنا حجزك {ref} للسيارة {car} وسنؤكده قريبًا. — {brand}',
   },
 };
 
@@ -65,7 +66,7 @@ function whatsappMessage(b: Booking): string {
     name: b.guestName, ref: b.reference, car: b.car ? `${b.car.brand} ${b.car.model}` : 'car',
     start: b.startDate, end: b.endDate, time: b.pickupTime,
   };
-  return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => ({ brand: brandName(), ...vars } as Record<string, string>)[k] ?? '');
 }
 
 const LANGUAGES: Record<string, string> = { en: 'English', fr: 'French', ar: 'Arabic' };
@@ -85,6 +86,7 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
   const navigate = useNavigate();
   const [chargeLabel, setChargeLabel] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
+  const [contractOpen, setContractOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid');
   const [amountPaid, setAmountPaid] = useState('0');
@@ -227,7 +229,12 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
           </div>
         )}
 
-        <OnlineContractPanel booking={b} />
+        {b.status !== 'declined' && b.status !== 'cancelled' && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 p-3 rounded-xl bg-white/[0.03] border border-white/10">
+            <div className="flex items-center gap-2 text-sm text-brand-muted">Contract <ContractBadge state={b.contractState ?? 'none'} /></div>
+            <button onClick={() => setContractOpen(true)} className="px-4 py-2 rounded-xl text-sm font-semibold bg-white/10 text-brand-text hover:bg-white/15">📄 Manage contract</button>
+          </div>
+        )}
 
         {ACTIONS[b.status].length > 0 && (
           <div className="flex flex-wrap gap-2 mb-5">
@@ -346,6 +353,8 @@ export default function BookingDetails({ booking, onClose, onChanged, onEdit }: 
           )}
         </div>
       </Modal>
+
+      {contractOpen && <ContractManager booking={b} onClose={() => { setContractOpen(false); onChanged(); }} onChanged={() => onChanged()} />}
 
       <ConfirmDialog
         open={confirmDelete}

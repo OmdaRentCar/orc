@@ -6,7 +6,8 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          red: '#e72526',
+          // Each agency's own colour, set at runtime (see services/agency.ts)
+          red: 'rgb(var(--brand-red) / <alpha-value>)',
           dark: '#0a0a0a',
           surface: '#161616',
           elevated: '#1f1f1f',

@@ -50,8 +50,11 @@ export default function BookingModal({ car, onClose, onSuccess }: Props) {
 
   useEffect(() => {
     if (!car) return;
-    setStartDate('');
-    setEndDate('');
+    // Dates can arrive in the address (?start=...&end=...)
+    const params = new URLSearchParams(window.location.search);
+    const wanted = (k: string) => { const v = params.get(k) ?? ''; return /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= localTodayISO() ? v : ''; };
+    setStartDate(wanted('start'));
+    setEndDate(wanted('start') ? wanted('end') : '');
     setPickupTime('10:00');
     setReturnTime('10:00');
     setDeliveryType('agency');

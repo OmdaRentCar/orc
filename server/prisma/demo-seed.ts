@@ -5,6 +5,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { createPrismaClient } from '../src/lib/prisma';
+import { runAsAgency, runUnscoped, requireAgency, AGENCY_SELECT } from '../src/lib/tenant';
 import { computeQuote } from '../src/services/pricing';
 import { DEFAULT_SETTINGS, BusinessSettings } from '../src/services/settings';
 import { generateReference } from '../src/services/reference';
@@ -128,15 +129,69 @@ const B: DemoBooking[] = [
 async function main() {
   console.log(`Seeding demo database ${dbName}${DEMO_EMAIL ? ` (demo emails go to ${DEMO_EMAIL})` : ' (no DEMO_EMAIL: demo customers have no email)'}`);
 
-  // Wipe everything (demo database only)
-  await prisma.$transaction([
-    prisma.auditLog.deleteMany(), prisma.alertLog.deleteMany(), prisma.notification.deleteMany(),
-    prisma.fine.deleteMany(), prisma.expense.deleteMany(), prisma.onlineContract.deleteMany(),
-    prisma.inspection.deleteMany(), prisma.booking.deleteMany(), prisma.car.deleteMany(),
-    prisma.blockedCustomer.deleteMany(), prisma.businessSettings.deleteMany(), prisma.adminUser.deleteMany(),
-  ]);
+  // Wipe everything (demo database only): removing the agencies removes all their data with them
+  await runUnscoped(async () => {
+    await prisma.alertLog.deleteMany();
+    await prisma.platformEvent.deleteMany();
+    await prisma.platformAdmin.deleteMany();
+    await prisma.agency.deleteMany();
+    // The platform console (http://app.localhost:5180/console)
+    await prisma.platformAdmin.create({ data: { email: 'console@demo.test', name: 'Platform owner', passwordHash: await bcrypt.hash('demo1234', 10) } });
+  });
+  // The flagship agency: Business plan granted by the platform, no end date
+  const agency = await runUnscoped(() => prisma.agency.create({
+    data: { slug: process.env.DEFAULT_AGENCY_SLUG || 'rentcar', name: 'RentCar', city: 'Tunis', ownerEmail: DEMO_EMAIL ?? 'admin@demo.test', phone: '+216 94 859 352' },
+    select: AGENCY_SELECT,
+  }));
+  await runAsAgency(agency, seedMainAgency);
 
-  await prisma.businessSettings.create({ data: { id: 1, data: settings as unknown as Prisma.InputJsonValue } });
+  // A second, smaller agency on the same platform: its data must never show up in the first one
+  const other = await runUnscoped(() => prisma.agency.create({
+    // On a Starter trial that ends in 2 days: shows the trial banner and the upgrade flow
+    data: { slug: 'sahel', name: 'Sahel Cars', primaryColor: '#1d4ed8', plan: 'starter', status: 'trial', trialEndsAt: new Date(Date.now() + 2 * 86_400_000), city: 'Sousse', ownerEmail: 'sahel@example.com', phone: '+216 73 000 000' },
+    select: AGENCY_SELECT,
+  }));
+  await runAsAgency(other, async () => {
+    await prisma.businessSettings.create({ data: { agencyId: other.id, data: { ...settings, contactEmail: 'contact@sahel-cars.example', contactPhone: '+216 73 000 000', whatsappNumber: '21673000000', companyName: 'Sahel Cars', companyAddress: 'Avenue Léopold Senghor, 4000 Sousse', companyTaxId: '7654321/B/M/000', siteTag: 'Sousse · Monastir · Enfidha', siteTitle1: 'Sahel', siteTitle2: 'Cars', siteText: 'Citadines récentes à petit prix, livrées à l’aéroport d’Enfidha et à votre hôtel. Réponse en 15 minutes sur WhatsApp.', siteAbout: 'Agence familiale à Sousse depuis 2015 : voitures récentes, révisées avant chaque location, et une équipe joignable 7 jours sur 7.' } as unknown as Prisma.InputJsonValue } });
+    await prisma.adminUser.create({ data: { username: 'admin', email: 'sahel@example.com', role: 'owner', passwordHash: await bcrypt.hash('demo1234', 10) } });
+    await prisma.car.createMany({ data: CARS.slice(0, 2).map(({ key: _key, ...c }) => ({ ...c, features: [...c.features], available: true })) });
+  });
+
+  // A paying Pro agency with a few months of invoices, for the console's revenue chart
+  const djerba = await runUnscoped(() => prisma.agency.create({
+    data: { slug: 'djerba-drive', name: 'Djerba Drive', primaryColor: '#d97706', plan: 'pro', status: 'active', city: 'Djerba', ownerEmail: 'djerba@example.com', phone: '+216 75 000 000', currentPeriodEnd: new Date(Date.now() + 18 * 86_400_000), createdAt: new Date(Date.now() - 130 * 86_400_000) },
+    select: AGENCY_SELECT,
+  }));
+  await runAsAgency(djerba, async () => {
+    await prisma.businessSettings.create({ data: { agencyId: djerba.id, data: { ...settings, contactEmail: 'contact@djerba-drive.example', contactPhone: '+216 75 000 000', whatsappNumber: '21675000000', companyName: 'Djerba Drive', companyAddress: 'Houmt Souk, Djerba', companyTaxId: '1112223/C/M/000', siteTag: 'Djerba · Zarzis', siteTitle1: 'Island', siteTitle2: 'Drive', siteText: 'SUV et électriques pour explorer Djerba : livraison gratuite à l’aéroport et dans les hôtels de la zone touristique.', siteAbout: 'Djerba Drive loue des voitures sur l’île depuis 2018. Nous connaissons chaque route, chaque plage et chaque hôtel.' } as unknown as Prisma.InputJsonValue } });
+    await prisma.adminUser.create({ data: { username: 'admin', email: 'djerba@example.com', role: 'owner', passwordHash: await bcrypt.hash('demo1234', 10) } });
+    await prisma.car.createMany({ data: CARS.filter((c) => ['tucson', 'dacia', 'tesla'].includes(c.key)).map(({ key: _key, ...c }) => ({ ...c, features: [...c.features], available: true })) });
+    for (let m = 4; m >= 1; m--) {
+      const paidAt = new Date(Date.now() - (m * 30 - 12) * 86_400_000);
+      const inv = await prisma.invoice.create({ data: { plan: 'pro', cycle: 'monthly', months: 1, amount: 129, status: 'paid', provider: m % 2 ? 'konnect' : 'transfer', paidAt, periodStart: paidAt, periodEnd: new Date(paidAt.getTime() + 30 * 86_400_000), createdAt: paidAt } });
+      await prisma.invoice.update({ where: { id: inv.id }, data: { number: `INV-${paidAt.getUTCFullYear()}-${String(inv.id).padStart(5, '0')}` } });
+    }
+  });
+
+  // An agency that did not pay after its trial: suspended (its site shows a "paused" page)
+  const capbon = await runUnscoped(() => prisma.agency.create({
+    data: { slug: 'capbon', name: 'Cap Bon Location', primaryColor: '#16a34a', plan: 'starter', status: 'suspended', city: 'Nabeul', ownerEmail: 'capbon@example.com', trialEndsAt: new Date(Date.now() - 25 * 86_400_000), pastDueSince: new Date(Date.now() - 25 * 86_400_000), createdAt: new Date(Date.now() - 40 * 86_400_000) },
+    select: AGENCY_SELECT,
+  }));
+  await runAsAgency(capbon, async () => {
+    await prisma.adminUser.create({ data: { username: 'admin', email: 'capbon@example.com', role: 'owner', passwordHash: await bcrypt.hash('demo1234', 10) } });
+    await prisma.car.createMany({ data: CARS.slice(7, 8).map(({ key: _key, ...c }) => ({ ...c, features: [...c.features], available: true })) });
+  });
+  await runUnscoped(() => prisma.platformEvent.createMany({ data: [
+    { actor: 'agency: djerba-drive', action: 'signup', agencyId: djerba.id, details: 'Pro trial · Djerba', createdAt: new Date(Date.now() - 130 * 86_400_000) },
+    { actor: 'agency: capbon', action: 'signup', agencyId: capbon.id, details: 'Starter trial · Nabeul', createdAt: new Date(Date.now() - 40 * 86_400_000) },
+    { actor: 'system', action: 'suspended', agencyId: capbon.id, details: 'not paid after the grace period', createdAt: new Date(Date.now() - 18 * 86_400_000) },
+    { actor: 'agency: sahel', action: 'signup', agencyId: other.id, details: 'Starter trial · Sousse', createdAt: new Date(Date.now() - 12 * 86_400_000) },
+  ] }));
+}
+
+async function seedMainAgency() {
+  await prisma.businessSettings.create({ data: { agencyId: requireAgency().id, data: settings as unknown as Prisma.InputJsonValue } });
 
   const hash = await bcrypt.hash('demo1234', 10);
   await prisma.adminUser.createMany({

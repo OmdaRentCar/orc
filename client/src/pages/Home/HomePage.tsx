@@ -13,26 +13,39 @@ import type { Car } from '../../types';
 import { apiJSON } from '../../services/api';
 import { useI18n } from '../../i18n';
 import ScrollScene from '../../components/three/ScrollScene';
+import { useAgency } from '../../context/AgencyContext';
+import { useBusinessSettings } from '../../services/settings';
+import { AgencyDirectory, Faq, HowItWorks, PlatformCallToAction, PlatformFeatures, Pricing } from './PlatformSections';
 
 function OverviewSection() {
   const { t } = useI18n();
+  const { agency } = useAgency();
+  const settings = useBusinessSettings();
+  const text = agency.isPlatform ? t('platform.overviewText') : settings?.siteAbout || t('overview.text');
+  const tag = agency.isPlatform ? t('platform.overviewTag', { brand: agency.name }) : t('overview.tag');
+  const title1 = agency.isPlatform ? t('platform.overviewTitle1') : t('overview.title1');
+  const title2 = agency.isPlatform ? t('platform.overviewTitle2') : t('overview.title2');
   return (
     <section id="section-overview" className="relative min-h-[110vh] flex items-center pointer-events-none px-6">
       <div className="max-w-xl">
-        <p className="section-tag opacity-0 animate-fade-up">{t('overview.tag')}</p>
+        <p className="section-tag opacity-0 animate-fade-up">{tag}</p>
         <h2 className="font-display text-[clamp(40px,6vw,80px)] font-extrabold uppercase leading-[0.92] tracking-tight text-brand-text mb-8 opacity-0 animate-fade-up" style={{ animationDelay: '0.1s' }}>
-          {t('overview.title1')}<br />{t('overview.title2')}
+          {title1}<br />{title2}
         </h2>
         <p className="text-brand-muted text-sm leading-[1.8] max-w-md opacity-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
-          {t('overview.text')}
+          {text}
         </p>
       </div>
     </section>
   );
 }
 
+// Each agency sets its own prices: the price filter goes up to its dearest car (rounded up to 50 DT)
+const ceilingFor = (cars: Car[]) => Math.max(100, Math.ceil(Math.max(0, ...cars.map((c) => c.price)) / 50) * 50);
+
 function CarsSection() {
   const { t } = useI18n();
+
   const { showToast } = useToast();
   const [cars, setCars] = useState<Car[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
@@ -42,7 +55,7 @@ function CarsSection() {
     search: '',
     brand: '',
     type: '',
-    maxPrice: 700,
+    maxPrice: Infinity, // no price limit until the fleet is known
     availableOnly: false,
   });
 
@@ -53,6 +66,8 @@ function CarsSection() {
       apiJSON<string[]>('/cars/types'),
     ]).then(([c, b, ty]) => {
       setCars(c);
+      // The slider starts at the dearest car, so no car is hidden before the visitor filters
+      setFilters((f) => ({ ...f, maxPrice: ceilingFor(c) }));
       setBrands(b);
       setTypes(ty);
     }).catch(() => showToast(t('fleet.loadFailed'), 'error'));
@@ -77,7 +92,7 @@ function CarsSection() {
         <div className="mb-10 pointer-events-auto">
           <p className="section-tag">{t('fleet.tag')}</p>
           <h2 className="font-display text-4xl font-extrabold uppercase text-brand-text mb-6 tracking-tight">{t('fleet.title')}</h2>
-          <FilterBar filters={filters} onChange={setFilters} brands={brands} types={types} />
+          <FilterBar filters={filters} onChange={setFilters} brands={brands} types={types} priceCeiling={ceilingFor(cars)} />
         </div>
 
         {filtered.length === 0 ? (
@@ -100,6 +115,7 @@ function CarsSection() {
 
 export default function HomePage() {
   const { hash } = useLocation();
+  const { agency } = useAgency();
 
   // Links from other pages arrive as /#section-fleet; scroll there once the page has laid out
   useEffect(() => {
@@ -117,9 +133,23 @@ export default function HomePage() {
         <div id="scroll-container" className="relative z-10 pointer-events-none">
           <HeroSection />
           <OverviewSection />
-          <CarsSection />
-          <FeaturesSection />
-          <section id="section-cta" className="relative min-h-screen flex items-end pointer-events-none">
+          {agency.isPlatform ? (
+            // General page: for agency owners. The fleet and booking live on each agency's own site.
+            <>
+              <PlatformFeatures />
+              <HowItWorks />
+              <Pricing />
+              <AgencyDirectory />
+              <Faq />
+            </>
+          ) : (
+            <>
+              <CarsSection />
+              <FeaturesSection />
+            </>
+          )}
+          <section id="section-cta" className="relative min-h-screen flex flex-col justify-end pointer-events-none">
+            {agency.isPlatform && <PlatformCallToAction />}
             <Footer />
           </section>
         </div>

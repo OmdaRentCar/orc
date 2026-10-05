@@ -18,19 +18,36 @@ import handoverRouter from './routes/handover';
 import finesRouter from './routes/fines';
 import financeRouter from './routes/finance';
 import contractsRouter from './routes/contracts';
+import agencyRouter from './routes/agency';
+import { agencyContext, subscriptionGuard } from './middleware/agency';
+import platformRouter from './routes/platform';
+import billingRouter from './routes/billing';
+import domainRouter from './routes/domain';
+import { allowedOrigin } from './lib/origins';
 
 export function createApp() {
   const app = express();
   // Render sits behind a proxy; without this the rate limiters see every client as the proxy's IP
   app.set('trust proxy', 1);
 
-  app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+  // Every agency site (sub-domain or own domain) calls this one API
+  app.use(cors({ origin: (origin, cb) => { allowedOrigin(origin).then((ok) => cb(null, ok), cb); } }));
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Everything below runs as the agency the request is for
+  // The platform (sign-up, marketplace, console, payment webhooks) belongs to no agency
+  app.use('/api/platform', platformRouter);
+
+  app.use('/api', agencyContext);
+  app.use('/api', subscriptionGuard);
+
+  app.use('/api/agency/domain', domainRouter);
+  app.use('/api/agency', agencyRouter);
+  app.use('/api/billing', billingRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/admins', adminsRouter);
   app.use('/api/cars', carsRouter);

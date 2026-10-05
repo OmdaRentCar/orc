@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { requireAgency } from '../lib/tenant';
 
 export const extraSchema = z.object({
   id: z.string().trim().min(1).max(50).regex(/^[a-z0-9-]+$/, 'id may only contain lowercase letters, numbers and dashes'),
@@ -55,6 +56,12 @@ export const settingsSchema = z.object({
   companyAddress: z.string().trim().max(300).default(''),
   companyTaxId: z.string().trim().max(60).default(''),
   contractTerms: z.string().trim().max(5000).default(DEFAULT_CONTRACT_TERMS),
+  // The agency's own words on its website (empty = the standard text, translated in every language)
+  siteTag: z.string().trim().max(40).default(''),
+  siteTitle1: z.string().trim().max(24).default(''),
+  siteTitle2: z.string().trim().max(24).default(''),
+  siteText: z.string().trim().max(240).default(''),
+  siteAbout: z.string().trim().max(600).default(''),
 });
 
 export type Extra = z.infer<typeof extraSchema>;
@@ -87,17 +94,22 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   companyAddress: '',
   companyTaxId: '',
   contractTerms: DEFAULT_CONTRACT_TERMS,
+  siteTag: '',
+  siteTitle1: '',
+  siteTitle2: '',
+  siteText: '',
+  siteAbout: '',
 };
 
 export async function getSettings(): Promise<BusinessSettings> {
-  const row = await prisma.businessSettings.findUnique({ where: { id: 1 } });
+  const row = await prisma.businessSettings.findUnique({ where: { agencyId: requireAgency().id } });
   return { ...DEFAULT_SETTINGS, ...((row?.data as Partial<BusinessSettings> | undefined) ?? {}) };
 }
 
 export async function saveSettings(data: BusinessSettings): Promise<BusinessSettings> {
   await prisma.businessSettings.upsert({
-    where: { id: 1 },
-    create: { id: 1, data },
+    where: { agencyId: requireAgency().id },
+    create: { agencyId: requireAgency().id, data },
     update: { data },
   });
   return data;

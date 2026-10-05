@@ -6,6 +6,7 @@ import { authMiddleware, requireOwner } from '../middleware/auth';
 import { uploadCarImages, deleteAsset } from '../services/cloudinary';
 import { audit } from '../services/audit';
 import { expiredDocuments } from '../services/rules';
+import { requireRoom } from '../lib/plans';
 import { isoDate, todayISO } from '../lib/dates';
 
 const router = Router();
@@ -101,7 +102,13 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   res.json(withDocumentStatus(car));
 });
 
-router.post('/', authMiddleware, uploadCarImages, async (req: Request, res: Response): Promise<void> => {
+// Checked before the photos are uploaded, so a refused car costs no upload
+const roomForCar = async (_req: Request, _res: Response, next: () => void) => {
+  requireRoom('cars', await prisma.car.count());
+  next();
+};
+
+router.post('/', authMiddleware, roomForCar, uploadCarImages, async (req: Request, res: Response): Promise<void> => {
   const files = req.files as UploadedFiles;
   const uploaded = [...(files?.image ?? []), ...(files?.gallery ?? [])].map((f) => f.path);
   try {

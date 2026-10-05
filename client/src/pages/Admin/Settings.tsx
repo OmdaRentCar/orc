@@ -1,12 +1,26 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { api } from '../../services/api';
 import BusinessSettingsForm from './BusinessSettingsForm';
+import AgencyProfileForm from './AgencyProfileForm';
+import DomainCard from './DomainCard';
+
+type Tab = 'agency' | 'business' | 'account';
+const TAB_INFO: Record<Tab, { label: string; intro: string }> = {
+  agency: { label: 'Agency & website', intro: 'Your name, logo, colour and address as customers see them on your website.' },
+  business: { label: 'Prices & rules', intro: 'Prices, extras, driver rules, contact details, website texts and the rental contract.' },
+  account: { label: 'My account', intro: 'Your own login: username, email and password.' },
+};
 
 export default function Settings() {
   const { user, isOwner, updateUser } = useAuth();
   const { showToast } = useToast();
+  // Owners manage the agency; everyone manages their own account
+  const tabs = (isOwner ? ['agency', 'business', 'account'] : ['account']) as Tab[];
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = tabs.includes(params.get('tab') as Tab) ? (params.get('tab') as Tab) : tabs[0];
 
   const [username, setUsername] = useState(user?.username ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -58,10 +72,26 @@ export default function Settings() {
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-3xl space-y-6">
       <div>
-      <h1 className="font-display text-2xl font-bold text-brand-text mb-1">Settings</h1>
-      <p className="text-sm text-brand-muted mb-8">Update your admin account credentials.</p>
+        <h1 className="font-display text-2xl font-bold text-brand-text mb-1">Settings</h1>
+        <p className="text-sm text-brand-muted">{TAB_INFO[tab].intro}</p>
+      </div>
+
+      <div role="tablist" className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
+        {tabs.map((id) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setParams({ tab: id }, { replace: true })}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === id ? 'bg-brand-red text-white' : 'text-brand-muted hover:text-brand-text'}`}>
+            {TAB_INFO[id].label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'agency' && <AgencyProfileForm />}
+      {tab === 'agency' && <DomainCard />}
+      {tab === 'business' && <BusinessSettingsForm />}
+      {tab === 'account' && (
+      <div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-brand-surface border border-white/5 rounded-2xl p-6 space-y-5">
@@ -136,14 +166,13 @@ export default function Settings() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-brand-red hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+          className="w-full bg-brand-red hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
         >
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
       </div>
-
-      {isOwner && <BusinessSettingsForm />}
+      )}
     </div>
   );
 }

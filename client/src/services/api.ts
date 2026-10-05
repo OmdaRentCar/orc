@@ -1,3 +1,5 @@
+import { AGENCY_SLUG } from './agency';
+
 const BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api`;
 
 function getToken(): string | null {
@@ -9,13 +11,16 @@ export async function api(endpoint: string, options: RequestInit = {}): Promise<
   const headers = new Headers(options.headers);
 
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  // Tells the API which agency's site this is (it may be on another domain than the site)
+  if (AGENCY_SLUG) headers.set('X-Agency-Slug', AGENCY_SLUG);
   if (!(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
   const res = await fetch(`${BASE}${endpoint}`, { ...options, headers });
 
-  if (res.status === 401 && !endpoint.includes('/auth/login')) {
+  // A refused login or one-time code is an answer, not an expired session
+  if (res.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/handoff')) {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     window.location.href = '/login';

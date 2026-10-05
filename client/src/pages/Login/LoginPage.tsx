@@ -1,11 +1,14 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiJSON } from '../../services/api';
 import type { AdminUser } from '../../types';
+import BrandName from '../../components/layout/BrandName';
+import { useAgency } from '../../context/AgencyContext';
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
+  const { agency } = useAgency();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +16,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (isAuthenticated) return <Navigate to="/admin" replace />;
+  // Arriving from sign-up or the platform console with a one-time code (#handoff=...)
+  const [handoff] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('handoff'));
+  const exchanged = useRef(false);
+  useEffect(() => {
+    // The code works once: never send it twice (React runs effects twice in development)
+    if (!handoff || exchanged.current) return;
+    exchanged.current = true;
+    window.history.replaceState(null, '', window.location.pathname);
+    apiJSON<{ token: string; user: AdminUser }>('/auth/handoff', { method: 'POST', body: JSON.stringify({ code: handoff }) })
+      .then((data) => { login(data.token, data.user); navigate('/admin', { replace: true }); })
+      .catch((err: Error) => setError(err.message));
+  }, [handoff, login, navigate]);
+
+  if (isAuthenticated && !handoff) return <Navigate to="/admin" replace />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,7 +68,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <Link to="/" className="inline-block mb-4">
               <p className="font-display text-3xl font-extrabold text-brand-text">
-                RentCar<span className="text-brand-red">.</span>
+                <BrandName />
               </p>
             </Link>
             <h1 className="text-xl font-bold text-brand-text">Admin Access</h1>
@@ -114,6 +130,10 @@ export default function LoginPage() {
               ) : 'Sign In'}
             </button>
           </form>
+          <p className="text-center text-xs text-brand-muted mt-5">
+            Wrong agency, or several agencies? 
+            <a href={`${agency.platform.url}/login`} className="text-brand-red hover:underline">Log in from one place →</a>
+          </p>
 
           <div className="mt-6 text-center">
             <Link to="/" className="text-xs text-brand-muted hover:text-brand-red transition-colors">

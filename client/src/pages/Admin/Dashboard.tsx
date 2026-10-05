@@ -6,6 +6,8 @@ import type { DashboardStats } from '../../types';
 import { money, whatsappUrl } from '../../utils/format';
 import { STATUS_LABELS, BadgeStatus } from '../../components/ui/Badge';
 import RevenueChart from './RevenueChart';
+import { brandName } from '../../services/agency';
+import Onboarding from './Onboarding';
 
 function StatCard({ label, value, icon, sub }: { label: string; value: string | number; icon: string; sub?: string }) {
   return (
@@ -42,25 +44,25 @@ function BarList({ data, total }: { data: { label: string; count: number }[]; to
 // One-click WhatsApp reminders, in the language the customer booked in
 const REMINDER: Record<string, { pickup: string; return: string; late: string }> = {
   en: {
-    pickup: 'Hello {name}, reminder: your car ({car}) is ready on {date} at {time}. Please bring your ID and driving licence. — RentCar',
-    return: 'Hello {name}, reminder: please return the car ({car}) on {date} at {time}, with the same fuel level. Thank you! — RentCar',
-    late: 'Hello {name}, the car ({car}) was due back on {date}. Please contact us to arrange the return. — RentCar',
+    pickup: 'Hello {name}, reminder: your car ({car}) is ready on {date} at {time}. Please bring your ID and driving licence. — {brand}',
+    return: 'Hello {name}, reminder: please return the car ({car}) on {date} at {time}, with the same fuel level. Thank you! — {brand}',
+    late: 'Hello {name}, the car ({car}) was due back on {date}. Please contact us to arrange the return. — {brand}',
   },
   fr: {
-    pickup: 'Bonjour {name}, rappel : votre véhicule ({car}) est prêt le {date} à {time}. Pensez à votre pièce d’identité et votre permis. — RentCar',
-    return: 'Bonjour {name}, rappel : merci de rendre le véhicule ({car}) le {date} à {time}, avec le même niveau de carburant. Merci ! — RentCar',
-    late: 'Bonjour {name}, le véhicule ({car}) devait être rendu le {date}. Merci de nous contacter pour organiser le retour. — RentCar',
+    pickup: 'Bonjour {name}, rappel : votre véhicule ({car}) est prêt le {date} à {time}. Pensez à votre pièce d’identité et votre permis. — {brand}',
+    return: 'Bonjour {name}, rappel : merci de rendre le véhicule ({car}) le {date} à {time}, avec le même niveau de carburant. Merci ! — {brand}',
+    late: 'Bonjour {name}, le véhicule ({car}) devait être rendu le {date}. Merci de nous contacter pour organiser le retour. — {brand}',
   },
   ar: {
-    pickup: 'مرحبًا {name}، تذكير: سيارتك ({car}) جاهزة يوم {date} على الساعة {time}. لا تنس بطاقة التعريف ورخصة السياقة. — RentCar',
-    return: 'مرحبًا {name}، تذكير: يرجى إرجاع السيارة ({car}) يوم {date} على الساعة {time} بنفس مستوى الوقود. شكرًا! — RentCar',
-    late: 'مرحبًا {name}، كان موعد إرجاع السيارة ({car}) يوم {date}. يرجى التواصل معنا لترتيب الإرجاع. — RentCar',
+    pickup: 'مرحبًا {name}، تذكير: سيارتك ({car}) جاهزة يوم {date} على الساعة {time}. لا تنس بطاقة التعريف ورخصة السياقة. — {brand}',
+    return: 'مرحبًا {name}، تذكير: يرجى إرجاع السيارة ({car}) يوم {date} على الساعة {time} بنفس مستوى الوقود. شكرًا! — {brand}',
+    late: 'مرحبًا {name}، كان موعد إرجاع السيارة ({car}) يوم {date}. يرجى التواصل معنا لترتيب الإرجاع. — {brand}',
   },
 };
 
 function reminder(kind: 'pickup' | 'return' | 'late', locale: string, vars: Record<string, string>): string {
   const text = (REMINDER[locale] ?? REMINDER.en)[kind];
-  return text.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+  return text.replace(/\{(\w+)\}/g, (_, k: string) => ({ brand: brandName(), ...vars } as Record<string, string>)[k] ?? '');
 }
 
 const LEVEL_STYLE = { expired: 'bg-red-500/10 text-red-400', soon: 'bg-orange-500/10 text-orange-400', upcoming: 'bg-yellow-500/10 text-yellow-300' };
@@ -98,7 +100,9 @@ export default function Dashboard() {
         <p className="text-sm text-brand-muted mt-1">Fleet and booking summary</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Onboarding />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="stats">
         <StatCard label="Active Rentals" value={stats.activeRentals} icon="🚗" sub="On the road today" />
         <StatCard label="Revenue" value={money(stats.revenue)} icon="💰" sub={`${money(stats.collected)} collected`} />
         <StatCard label="In Maintenance" value={stats.inMaintenance} icon="🔧" sub="Unavailable cars" />
@@ -208,7 +212,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="stats">
         <div className="glass-card p-5 col-span-2 lg:col-span-1">
           <p className="text-sm text-brand-muted mb-1">Total Cars</p>
           <p className="font-display text-3xl font-extrabold text-brand-text">{stats.totalCars}</p>

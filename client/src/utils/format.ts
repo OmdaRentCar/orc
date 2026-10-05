@@ -1,6 +1,7 @@
-// "450 DT", "1502.8 DT": up to 3 decimals (the dinar has millimes), no trailing zeros
+// "450 DT", "18,586.87 DT": thousands separated, up to 3 decimals (the dinar has millimes), no trailing zeros
+const AMOUNT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 export function money(amount: number): string {
-  return `${Number(amount.toFixed(3))} DT`;
+  return `${AMOUNT.format(Number(amount.toFixed(3)))} DT`;
 }
 
 // Same rules as the server: digits only, and Tunisia's 216 prefix for 8-digit local numbers

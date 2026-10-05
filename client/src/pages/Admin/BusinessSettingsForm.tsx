@@ -168,6 +168,33 @@ export default function BusinessSettingsForm() {
       </fieldset>
 
       <fieldset className="rounded-xl border border-white/10 p-4 space-y-3">
+        <legend className="px-1 text-sm font-semibold text-brand-text">Your website texts</legend>
+        <p className="text-xs text-brand-muted -mt-1">Shown on your booking site. Leave a field empty to keep the standard text (translated in English, French and Arabic).</p>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass} htmlFor="bs-tag">Small title</label>
+            <input id="bs-tag" value={s.siteTag ?? ''} onChange={text('siteTag')} maxLength={40} placeholder="Premium Fleet" className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="bs-t1">Big title, line 1</label>
+            <input id="bs-t1" value={s.siteTitle1 ?? ''} onChange={text('siteTitle1')} maxLength={24} placeholder="Drive" className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="bs-t2">Big title, line 2</label>
+            <input id="bs-t2" value={s.siteTitle2 ?? ''} onChange={text('siteTitle2')} maxLength={24} placeholder="Extraordinary" className={inputClass} />
+          </div>
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="bs-st">Introduction (under the big title)</label>
+          <textarea id="bs-st" value={s.siteText ?? ''} onChange={(e) => setSettings({ ...s, siteText: e.target.value })} maxLength={240} rows={2} placeholder="Experience luxury and performance with our exclusive fleet…" className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="bs-ab">About your agency</label>
+          <textarea id="bs-ab" value={s.siteAbout ?? ''} onChange={(e) => setSettings({ ...s, siteAbout: e.target.value })} maxLength={600} rows={3} placeholder="Family agency in Sousse since 2015, cars delivered to the airport and your hotel…" className={inputClass} />
+        </div>
+      </fieldset>
+
+      <fieldset className="rounded-xl border border-white/10 p-4 space-y-3">
         <legend className="px-1 text-sm font-semibold text-brand-text">Rental contract</legend>
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
@@ -210,7 +237,7 @@ export default function BusinessSettingsForm() {
         </div>
       </div>
 
-      <button type="submit" disabled={saving} className="w-full bg-brand-red hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+      <button type="submit" disabled={saving} className="w-full bg-brand-red hover:brightness-110 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors text-sm">
         {saving ? 'Saving...' : 'Save business settings'}
       </button>
     </form>

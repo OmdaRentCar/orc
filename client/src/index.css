@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* The agency's colour as "R G B"; replaced at runtime with the agency's own */
+  --brand-red: 231 37 38;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

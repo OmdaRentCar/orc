@@ -1,4 +1,6 @@
 import prisma from '../lib/prisma';
+import { runAsAgency, runUnscoped, AGENCY_SELECT } from '../lib/tenant';
+import { runSubscriptionJobs } from './subscriptionJobs';
 import { addDaysISO, localInstant, todayISO } from '../lib/dates';
 import { sendBookingEmail, sendAdminEmail } from './email';
 import { getSettings } from './settings';
@@ -125,12 +127,25 @@ export function startJobs(): void {
   // Set on extra instances (e.g. a test server on the same database) so reminders are only sent once
   if (process.env.DISABLE_JOBS === 'true') return;
   const run = async () => {
+    // Each agency's reminders run in its own context, so emails carry its name and links
+    // Subscriptions first, so a newly suspended agency gets no customer reminders
     try {
-      const r = await runReminders();
-      const alerts = await runCarAlerts();
-      if (r.pickup || r.return || r.late || alerts) console.log(`[JOBS] reminders: ${r.pickup} pick-up, ${r.return} return, ${r.late} late · ${alerts} car alert(s)`);
+      const s = await runSubscriptionJobs();
+      if (s.reminders || s.pastDue || s.suspended) console.log(`[JOBS] subscriptions: ${s.reminders} reminder(s), ${s.pastDue} past due, ${s.suspended} suspended`);
     } catch (err) {
-      console.error('[JOBS] failed:', (err as Error).message);
+      console.error('[JOBS] subscriptions failed:', (err as Error).message);
+    }
+    const agencies = await runUnscoped(() => prisma.agency.findMany({
+      where: { status: { in: ['active', 'trial', 'past_due'] } },
+      select: AGENCY_SELECT,
+    })).catch((err) => { console.error('[JOBS] failed:', (err as Error).message); return []; });
+    for (const agency of agencies) {
+      try {
+        const { r, alerts } = await runAsAgency(agency, async () => ({ r: await runReminders(), alerts: await runCarAlerts() }));
+        if (r.pickup || r.return || r.late || alerts) console.log(`[JOBS] ${agency.slug}: ${r.pickup} pick-up, ${r.return} return, ${r.late} late · ${alerts} car alert(s)`);
+      } catch (err) {
+        console.error(`[JOBS] ${agency.slug} failed:`, (err as Error).message);
+      }
     }
   };
   setTimeout(run, 20_000);

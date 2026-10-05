@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
+import { currentAgency, requireAgency } from '../lib/tenant';
 
 export type AdminRole = 'owner' | 'staff';
 
@@ -20,14 +21,16 @@ declare global {
 }
 
 export function signToken(user: AuthUser): string {
-  return jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '24h' });
+  return jwt.sign({ ...user, agencyId: requireAgency().id }, process.env.JWT_SECRET!, { expiresIn: '24h' });
 }
 
 // Resolves a token to the admin as currently stored, so deleted accounts and role changes apply immediately
 export async function userFromToken(token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
   try {
-    const { id } = jwt.verify(token, process.env.JWT_SECRET!) as { id: number };
+    const { id, agencyId } = jwt.verify(token, process.env.JWT_SECRET!) as { id: number; agencyId?: number };
+    // A login is only valid on the agency it was made for
+    if (agencyId !== currentAgency()?.id) return null;
     const admin = await prisma.adminUser.findUnique({
       where: { id },
       select: { id: true, username: true, email: true, role: true },

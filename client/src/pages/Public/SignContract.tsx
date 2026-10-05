@@ -5,6 +5,7 @@ import { useI18n, Lang, TKey } from '../../i18n';
 import LanguageSwitcher from '../../components/public/LanguageSwitcher';
 import SignaturePad from '../../components/admin/SignaturePad';
 import type { BookingExtra } from '../../types';
+import { brandName } from '../../services/agency';
 
 interface SignView {
   reference: string;
@@ -114,7 +115,7 @@ export default function SignContract() {
   const shell = (children: React.ReactNode) => (
     <div className="min-h-screen bg-brand-dark">
       <header className="max-w-2xl mx-auto px-5 pt-6 pb-2 flex items-center justify-between">
-        <Link to="/" className="font-display font-extrabold text-2xl text-brand-text" dir="ltr">{view?.company || 'RentCar'}<span className="text-brand-red">.</span></Link>
+        <Link to="/" className="font-display font-extrabold text-2xl text-brand-text" dir="ltr">{view?.company || brandName()}<span className="text-brand-red">.</span></Link>
         <LanguageSwitcher />
       </header>
       <main className="max-w-2xl mx-auto px-5 pb-16">{children}</main>
@@ -125,7 +126,7 @@ export default function SignContract() {
     return shell(
       <div className="glass-card p-8 mt-10 text-center">
         <p className="text-brand-text">{t(fatal)}</p>
-        <Link to="/" className="inline-block mt-6 text-sm text-brand-red">RentCar →</Link>
+        <Link to="/" className="inline-block mt-6 text-sm text-brand-red">{brandName()} →</Link>
       </div>,
     );
   }

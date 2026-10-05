@@ -13,9 +13,11 @@ interface Props {
   onChange: (f: FilterState) => void;
   brands: string[];
   types: string[];
+  // Top of the price slider: the dearest car of this agency's fleet
+  priceCeiling: number;
 }
 
-export default function FilterBar({ filters, onChange, brands, types }: Props) {
+export default function FilterBar({ filters, onChange, brands, types, priceCeiling }: Props) {
   const { t } = useI18n();
   const set = (key: keyof FilterState, value: string | number | boolean) =>
     onChange({ ...filters, [key]: value });
@@ -54,15 +56,15 @@ export default function FilterBar({ filters, onChange, brands, types }: Props) {
       <div className="flex items-center gap-2.5">
         <input
           type="range"
-          min={50}
-          max={700}
+          min={10}
+          max={priceCeiling}
           step={10}
-          value={filters.maxPrice}
+          value={Math.min(filters.maxPrice, priceCeiling)}
           onChange={(e) => set('maxPrice', parseInt(e.target.value))}
-          aria-label={t('filter.maxPrice', { price: filters.maxPrice })}
+          aria-label={t('filter.maxPrice', { price: Math.min(filters.maxPrice, priceCeiling) })}
           className="cursor-pointer w-24 accent-brand-red"
         />
-        <span className="text-xs text-brand-muted whitespace-nowrap uppercase tracking-[0.1em]">{t('filter.maxPrice', { price: filters.maxPrice })}</span>
+        <span className="text-xs text-brand-muted whitespace-nowrap uppercase tracking-[0.1em]">{t('filter.maxPrice', { price: Math.min(filters.maxPrice, priceCeiling) })}</span>
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">

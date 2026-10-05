@@ -3,6 +3,17 @@ import multer from 'multer';
 import type { Request } from 'express';
 import type { StorageEngine } from 'multer';
 import { HttpError } from '../lib/http';
+import type { RequestHandler } from 'express';
+import { requireAgency, runAsAgency } from '../lib/tenant';
+
+// Each agency's files live in their own folder
+export const agencyFolder = (sub: string, agencyId = requireAgency().id) => `agencies/${agencyId}/${sub}`;
+
+// Multer reads the upload from network events, outside the request's agency context:
+// take the agency from the request, and resume the route inside its context afterwards
+function inAgency(upload: RequestHandler): RequestHandler {
+  return (req, res, next) => upload(req, res, (err?: unknown) => (req.agency ? runAsAgency(req.agency, () => next(err)) : next(err)));
+}
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -23,11 +34,12 @@ export class UploadError extends Error {
   }
 }
 
-function cloudinaryStorage(folder: string, opts: Record<string, unknown> = {}): StorageEngine {
+function cloudinaryStorage(sub: string, opts: Record<string, unknown> = {}): StorageEngine {
   return {
-    _handleFile(_req: Request, file: Express.Multer.File, cb: (error: Error | null, info?: Partial<CloudinaryFile>) => void) {
+    _handleFile(req: Request, file: Express.Multer.File, cb: (error: Error | null, info?: Partial<CloudinaryFile>) => void) {
+      if (!req.agency) return cb(new Error('No agency for this upload'));
       const stream = cloudinary.uploader.upload_stream(
-        { folder, ...opts },
+        { folder: agencyFolder(sub, req.agency.id), ...opts },
         (error, result) => {
           if (error || !result) return cb(new UploadError(error?.message ?? 'Upload failed'));
           // Private uploads come back with a permanent signature ("s--abc--") that would let the URL open forever;
@@ -54,8 +66,8 @@ function allowTypes(mimeTypes: string[], label: string) {
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Car photos are public: the main photo plus up to 8 gallery photos
-export const uploadCarImages = multer({
-  storage: cloudinaryStorage('rentcar/cars', {
+export const uploadCarImages = inAgency(multer({
+  storage: cloudinaryStorage('cars', {
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     transformation: [{ width: 1200, height: 800, crop: 'fill', quality: 'auto' }],
   }),
@@ -64,18 +76,18 @@ export const uploadCarImages = multer({
 }).fields([
   { name: 'image', maxCount: 1 },
   { name: 'gallery', maxCount: 8 },
-]);
+]));
 
 // Customer ID documents are private ("authenticated"): their URL alone does not open them,
 // admins get a short-lived signed link from signedDocumentUrl()
-export const uploadDocument = multer({
-  storage: cloudinaryStorage('rentcar/documents', {
+export const uploadDocument = inAgency(multer({
+  storage: cloudinaryStorage('documents', {
     type: 'authenticated',
     allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
   }),
   fileFilter: allowTypes(['image/jpeg', 'image/png', 'application/pdf'], 'JPG, PNG or PDF'),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-});
+}).single('document'));
 
 interface AssetRef {
   resourceType: string;
@@ -117,18 +129,18 @@ export function signedDocumentUrl(url: string, ttlSeconds = 600): string {
 }
 
 // Handover photos and signatures: private, like ID documents
-export const uploadHandoverPhotos = multer({
-  storage: cloudinaryStorage('rentcar/handover', {
+export const uploadHandoverPhotos = inAgency(multer({
+  storage: cloudinaryStorage('handover', {
     type: 'authenticated',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'heic'],
     transformation: [{ width: 1600, height: 1600, crop: 'limit', quality: 'auto' }],
   }),
   fileFilter: allowTypes([...IMAGE_TYPES, 'image/heic', 'image/heif'], 'JPG, PNG, WebP or HEIC'),
   limits: { fileSize: 12 * 1024 * 1024, files: 16, fieldSize: 2 * 1024 * 1024 },
-}).array('photos', 16);
+}).array('photos', 16));
 
-export async function uploadPrivateImage(dataUrl: string, folder: string): Promise<string> {
-  const result = await cloudinary.uploader.upload(dataUrl, { folder, type: 'authenticated' }).catch((e: { message?: string }) => {
+export async function uploadPrivateImage(dataUrl: string, sub: string): Promise<string> {
+  const result = await cloudinary.uploader.upload(dataUrl, { folder: agencyFolder(sub), type: 'authenticated' }).catch((e: { message?: string }) => {
     throw new UploadError(e.message ?? 'Upload failed');
   });
   return result.secure_url.replace(/\/s--[^/]+--(?=\/)/, '');
@@ -168,5 +180,15 @@ export async function downloadPrivateFile(url: string): Promise<Buffer> {
   if (!res.ok) throw new UploadError(`Could not fetch the stored file (${res.status})`);
   return Buffer.from(await res.arrayBuffer());
 }
+
+// The agency's logo: public, shown on its site
+export const uploadAgencyLogo = inAgency(multer({
+  storage: cloudinaryStorage('brand', {
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
+    transformation: [{ width: 600, height: 600, crop: 'limit' }],
+  }),
+  fileFilter: allowTypes([...IMAGE_TYPES, 'image/svg+xml'], 'JPG, PNG, WebP or SVG'),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+}).single('logo'));
 
 export { cloudinary };

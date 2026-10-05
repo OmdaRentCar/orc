@@ -36,6 +36,7 @@ vi.stubGlobal('fetch', async () => ({ ok: false }));
 
 const { createApp } = await import('../src/app');
 const { default: prisma } = await import('../src/lib/prisma');
+const { asMain } = await import('./agency');
 const { addDaysISO, todayISO } = await import('../src/lib/dates');
 
 const app = createApp();
@@ -63,10 +64,11 @@ const lastEmail = (kind: string) => [...sent].reverse().find((e) => e.kind === k
 const tokenFrom = (link: string) => link.split('/sign/')[1];
 
 beforeAll(async () => {
-  await prisma.adminUser.upsert({
-    where: { username: 'sign-owner' },
-    create: { username: 'sign-owner', email: 'sign-owner@test.local', role: 'owner', passwordHash: await bcrypt.hash('sign-password-1', 4) },
-    update: {},
+  const passwordHash = await bcrypt.hash('sign-password-1', 4);
+  await asMain(async () => {
+    if (!await prisma.adminUser.findFirst({ where: { username: 'sign-owner' } })) {
+      await prisma.adminUser.create({ data: { username: 'sign-owner', email: 'sign-owner@test.local', role: 'owner', passwordHash } });
+    }
   });
   token = (await request(app).post('/api/auth/login').send({ username: 'sign-owner', password: 'sign-password-1' })).body.token;
   const settings = (await request(app).get('/api/settings')).body;
@@ -74,7 +76,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.adminUser.delete({ where: { username: 'sign-owner' } });
+  await asMain(() => prisma.adminUser.deleteMany({ where: { username: 'sign-owner' } }));
   await prisma.$disconnect();
 });
 
@@ -96,7 +98,7 @@ describe('online contract signature', () => {
     expect(res.body.state).toBe('sent');
     link = res.body.link;
     expect(lastEmail('sign_request').opts?.actionUrl).toBe(link);
-    const row = await prisma.onlineContract.findUnique({ where: { bookingId: booking.id } });
+    const row = await asMain(() => prisma.onlineContract.findUnique({ where: { bookingId: booking.id } }));
     expect(row?.tokenHash).not.toContain(tokenFrom(link));
   });
 
@@ -146,7 +148,7 @@ describe('online contract signature', () => {
     expect(pdf.status).toBe(200);
     expect(sha256(pdf.body as Buffer)).toBe(res.body.documentHash);
 
-    const log = await prisma.auditLog.findFirst({ where: { entityId: booking.id, action: 'contract:signed' } });
+    const log = await asMain(() => prisma.auditLog.findFirst({ where: { entityId: booking.id, action: 'contract:signed' } }));
     expect(log?.username).toBe('customer: Amira Ben Salah');
   });
 
@@ -181,5 +183,35 @@ describe('online contract signature', () => {
   it('keeps the agency routes private', async () => {
     expect((await request(app).post(`/api/bookings/${booking.id}/contract/send`).send({})).status).toBe(401);
     expect((await request(app).get(`/api/bookings/${booking.id}/contract/signed.pdf`)).status).toBe(401);
+  });
+
+  it('shows each booking’s contract state in the list', async () => {
+    const fresh = await newBooking('state@test.local');
+    const stateOf = async (id: number) => (await request(app).get('/api/bookings').set(auth())).body.find((b: { id: number }) => b.id === id).contractState;
+    expect(await stateOf(fresh.id)).toBe('none');
+    const sentLink = (await request(app).post(`/api/bookings/${fresh.id}/contract/send`).set(auth()).send({})).body.link;
+    expect(await stateOf(fresh.id)).toBe('sent');
+    await request(app).get(`/api/sign/${tokenFrom(sentLink)}`);
+    expect(await stateOf(fresh.id)).toBe('opened');
+    await request(app).post(`/api/bookings/${fresh.id}/contract/revoke`).set(auth());
+    expect(await stateOf(fresh.id)).toBe('revoked');
+    expect(await stateOf(booking.id)).toBe('signed_online');
+  });
+
+  it('emails the contract: the signed copy once signed, the current contract before', async () => {
+    const signedCopy = await request(app).post(`/api/bookings/${booking.id}/contract/email`).set(auth());
+    expect(signedCopy.body).toMatchObject({ emailed: true, to: 'signer@test.local', signed: true });
+    expect(lastEmail('contract_signed').attachments[0].filename).toMatch(/^contrat-signe-/);
+
+    const unsigned = await newBooking('copy@test.local');
+    const copy = await request(app).post(`/api/bookings/${unsigned.id}/contract/email`).set(auth());
+    expect(copy.body).toMatchObject({ emailed: true, signed: false });
+    const mail = lastEmail('contract_copy');
+    expect(mail.to).toBe('copy@test.local');
+    expect(mail.attachments[0].content.subarray(0, 4).toString()).toBe('%PDF');
+
+    const noEmail = await newBooking(null);
+    expect((await request(app).post(`/api/bookings/${noEmail.id}/contract/email`).set(auth())).status).toBe(400);
+    expect((await request(app).post(`/api/bookings/${unsigned.id}/contract/email`)).status).toBe(401);
   });
 });

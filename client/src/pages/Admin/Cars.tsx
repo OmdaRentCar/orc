@@ -8,6 +8,7 @@ import Pagination from '../../components/ui/Pagination';
 import CarForm from './CarForm';
 import { useAuth } from '../../context/AuthContext';
 import type { Car } from '../../types';
+import { money } from '../../utils/format';
 
 const PAGE_SIZE = 10;
 
@@ -123,7 +124,7 @@ export default function Cars() {
                     {car.documentsExpired.length > 0 && <p className="text-xs text-red-400">Expired: {car.documentsExpired.join(', ')} · not bookable</p>}
                   </td>
                   <td className="px-4 py-3 text-brand-muted text-xs">{car.type}</td>
-                  <td className="px-4 py-3 text-brand-red font-bold">{car.price} DT</td>
+                  <td className="px-4 py-3 text-brand-red font-bold">{money(car.price)}</td>
                   <td className="px-4 py-3">
                     <Badge status={car.available ? 'available' : 'maintenance'} />
                   </td>

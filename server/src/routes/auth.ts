@@ -6,6 +6,8 @@ import prisma from '../lib/prisma';
 import { HttpError, parseBody } from '../lib/http';
 import { authMiddleware, signToken, AdminRole } from '../middleware/auth';
 import { audit } from '../services/audit';
+import { consumeHandoff } from '../lib/handoff';
+import { requireAgency } from '../lib/tenant';
 
 const router = Router();
 
@@ -31,12 +33,25 @@ const updateMeSchema = z.object({
 router.post('/login', loginLimiter, async (req: Request, res: Response): Promise<void> => {
   const { username, password } = parseBody(loginSchema, req.body);
 
-  const admin = await prisma.adminUser.findUnique({ where: { username } });
+  const admin = await prisma.adminUser.findFirst({ where: { username } });
   if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) {
     throw new HttpError(401, 'Invalid credentials');
   }
 
   const user = { id: admin.id, username: admin.username, email: admin.email, role: admin.role as AdminRole };
+  res.json({ token: signToken(user), user });
+});
+
+// Exchanges a one-time code (after sign-up, or from the platform console) for a normal login on this agency
+router.post('/handoff', loginLimiter, async (req: Request, res: Response): Promise<void> => {
+  const { code } = parseBody(z.object({ code: z.string().min(20).max(2000) }), req.body);
+  const handoff = consumeHandoff(code, requireAgency().id);
+  if (!handoff) throw new HttpError(401, 'This link has expired. Please log in.');
+  const admin = await prisma.adminUser.findUnique({ where: { id: handoff.adminId } });
+  if (!admin) throw new HttpError(401, 'This link has expired. Please log in.');
+  const user = { id: admin.id, username: admin.username, email: admin.email, role: admin.role as AdminRole };
+  req.user = user;
+  if (handoff.by !== 'signup' && handoff.by !== 'self') await audit(req, 'login', 'admin', admin.id, `opened from the platform console by ${handoff.by}`);
   res.json({ token: signToken(user), user });
 });
 
@@ -55,10 +70,10 @@ router.put('/me', authMiddleware, async (req: Request, res: Response): Promise<v
     throw new HttpError(400, 'Current password is incorrect');
   }
 
-  if (username && username !== admin.username && await prisma.adminUser.findUnique({ where: { username } })) {
+  if (username && username !== admin.username && await prisma.adminUser.findFirst({ where: { username } })) {
     throw new HttpError(409, 'Username already taken');
   }
-  if (email && email !== admin.email && await prisma.adminUser.findUnique({ where: { email } })) {
+  if (email && email !== admin.email && await prisma.adminUser.findFirst({ where: { email } })) {
     throw new HttpError(409, 'Email already in use');
   }
 

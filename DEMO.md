@@ -12,8 +12,9 @@ Une démo complète, avec des données réalistes, sur **sa propre base de donn�
 
 | | |
 |---|---|
-| Site | http://localhost:5180 |
-| Administration | http://localhost:5180/login |
+| Page générale (toutes les agences) | http://localhost:5180 |
+| Site de l’agence RentCar | http://rentcar.localhost:5180 |
+| Administration (connexion unique) | http://localhost:5180/login |
 | Propriétaire | `admin` / `demo1234` |
 | Agent (droits limités) | `agent` / `demo1234` |
 
@@ -174,6 +175,39 @@ Tous les e-mails de démo arrivent dans **votre Gmail** (pensez à regarder auss
 | Retour (B5) | Rapport de retour en PDF |
 | Veille du départ | Rappel (déjà envoyé à Leila, en arabe, au lancement de la démo) |
 | Papiers de voitures | Récapitulatif des alertes envoyé à l’agence |
+
+## D. Plateforme multi-agences (abonnements)
+
+Le système a **4 espaces**, chacun avec un seul rôle :
+
+| Espace | Adresse (démo) | Pour qui | Contenu |
+|---|---|---|---|
+| 1. Page générale | http://localhost:5180 | Les gérants d’agence | Présentation, fonctionnalités, tarifs, annuaire des agences, FAQ. **Pas de flotte, pas de réservation.** |
+| 2. Site d’une agence | http://sahel.localhost:5180 (et `rentcar`, `djerba-drive`, `capbon`) | Les clients de l’agence | La page 3D avec **sa** flotte, la réservation, « Ma réservation », WhatsApp |
+| 3. Tableau de bord | http://sahel.localhost:5180/admin | Le gérant et ses employés | Réservations, voitures, contrats, abonnement |
+| 4. Console | http://localhost:5180/console | Vous (la plateforme) | Toutes les agences, paiements, suspensions |
+
+**Une seule connexion** pour les espaces 3 et 4 : http://localhost:5180/login (`admin` / `demo1234` ouvre la liste des agences ; `console@demo.test` / `demo1234` ouvre la console).
+
+Agences de la démo : RentCar (Business), Sahel Cars (essai qui finit dans 2 jours), Djerba Drive (Pro payé), Cap Bon Location (suspendue). Chacune : `admin` / `demo1234`.
+
+**D1. Inscription d’une nouvelle agence.** Sur http://localhost:5180, cliquez sur « Create my agency », remplissez les 3 étapes.
+- **Attendu :** l’adresse du site est vérifiée en direct ; à la fin, vous arrivez **directement connecté** dans le tableau de bord de la nouvelle agence. Une **visite guidée** (13 étapes) démarre toute seule ; on peut la relancer avec le bouton « 🧭 Tour » en haut. La liste « Get your agency ready » s’affiche en haut de l’aperçu.
+
+**D2. Limites de formule.** Dans la nouvelle agence (Starter), ajoutez 6 voitures.
+- **Attendu :** la 6e est refusée avec un message qui invite à changer de formule. Sur Starter, l’envoi du contrat pour signature en ligne est aussi refusé.
+
+**D3. Paiement (mode test).** *Subscription* → choisissez Pro → « Pay 129 DT » → « Pay (test) ».
+- **Attendu :** formule Pro active, payée jusqu’à dans un mois, facture `INV-…` téléchargeable en PDF. Aucun argent réel : tant que Konnect ou Flouci n’est pas configuré, une page de paiement simulée remplace la vraie.
+
+**D4. Agence suspendue.** Ouvrez http://capbon.localhost:5180.
+- **Attendu :** le site affiche « réservations momentanément indisponibles » (FR/EN/AR). Connectée, l’agence ne voit que la page *Subscription* ; après paiement, tout se rouvre aussitôt.
+
+**D5. Page générale.** Ouvrez http://localhost:5180 et faites défiler.
+- **Attendu :** même design 3D que les agences, mais pour les gérants : fonctionnalités, étapes, tarifs (mensuel/annuel), annuaire des agences (Cap Bon, suspendue, n’y figure pas), FAQ. Aucune voiture, aucune réservation. Un clic sur une agence ouvre son propre site.
+
+**D6. Console.** Connectez-vous à la console.
+- **Attendu :** revenus mensuels récurrents, revenus et inscriptions par mois, essais qui se terminent. Sur une agence : enregistrer un virement, prolonger l’essai, changer de formule ou de statut, « Open their dashboard » (ouvre son tableau de bord pour le support, tracé des deux côtés), supprimer (en retapant son adresse).
 
 ## Recommencer
 

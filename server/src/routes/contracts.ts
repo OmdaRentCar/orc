@@ -8,9 +8,11 @@ import { authMiddleware } from '../middleware/auth';
 import { contractPdf } from '../services/pdf';
 import { getSettings } from '../services/settings';
 import { sendBookingEmail } from '../services/email';
-import { uploadPrivateImage, uploadPrivatePdf, downloadPrivateFile, deleteAsset } from '../services/cloudinary';
+import { uploadPrivateImage, uploadPrivatePdf, downloadPrivateFile, deleteAsset, agencyFolder } from '../services/cloudinary';
+import { agencySiteUrl } from '../lib/tenant';
 import { emitBookingUpdate } from '../socket';
 import { audit } from '../services/audit';
+import { requireFeature } from '../lib/plans';
 
 // Remote contract signature: the agency sends a personal link by email, the customer proves it is them
 // with a one-time code sent to the same email, reads the contract and signs on screen. The signed PDF is
@@ -31,7 +33,8 @@ const publicLimiter = limiter(15, 60);
 const codeLimiter = limiter(15, 8);
 
 const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
-const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+// Links in emails and PDFs point to the agency's own site
+const clientUrl = () => agencySiteUrl();
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function verificationCode(): string {
@@ -81,6 +84,7 @@ router.get('/bookings/:id/contract', authMiddleware, async (req: Request, res: R
 
 router.post('/bookings/:id/contract/send', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   const id = parseId(req.params.id);
+  requireFeature('onlineSignature', 'Online contract signature');
   const { sendEmail } = parseBody(z.object({ sendEmail: z.boolean().default(true) }), req.body ?? {});
   const b = await fullBooking(id);
   if (!b) throw new HttpError(404, 'Booking not found');
@@ -114,6 +118,23 @@ router.post('/bookings/:id/contract/revoke', authMiddleware, async (req: Request
   const updated = await prisma.onlineContract.update({ where: { bookingId: id }, data: { revokedAt: new Date(), otpHash: null } });
   await audit(req, 'contract:revoked', 'booking', id);
   res.json(contractStatus(updated));
+});
+
+// Emails the contract PDF to the customer: the frozen signed copy if it exists, otherwise the current contract
+router.post('/bookings/:id/contract/email', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  const id = parseId(req.params.id);
+  const b = await fullBooking(id);
+  if (!b) throw new HttpError(404, 'Booking not found');
+  if (!b.email) throw new HttpError(400, 'This booking has no email address');
+  if (b.status === 'declined' || b.status === 'cancelled') throw new HttpError(400, `This booking is ${b.status}`);
+
+  const signed = b.onlineContract?.pdfUrl ? await downloadPrivateFile(b.onlineContract.pdfUrl) : null;
+  const pdf = signed ?? await contractPdf(b, await getSettings());
+  const filename = `${signed ? 'contrat-signe' : 'contrat'}-${b.reference}.pdf`;
+  const emailed = await sendBookingEmail(signed ? 'contract_signed' : 'contract_copy', b.email, emailData(b), [{ filename, content: pdf }]);
+  if (!emailed && !inTests) throw new HttpError(502, 'The email could not be sent. Check the SMTP settings.');
+  await audit(req, 'contract:emailed', 'booking', id, `${b.reference} to ${b.email}${signed ? ' (signed copy)' : ''}`);
+  res.json({ emailed, to: b.email, signed: !!signed });
 });
 
 router.get('/bookings/:id/contract/signed.pdf', authMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -237,8 +258,8 @@ router.post('/sign/:token', publicLimiter, async (req: Request, res: Response): 
   let signatureUrl: string | null = null;
   let pdfUrl: string | null = null;
   try {
-    signatureUrl = await uploadPrivateImage(input.signature, 'rentcar/contracts');
-    pdfUrl = await uploadPrivatePdf(pdf, `rentcar/contracts/${c.booking.reference}-${code}.pdf`);
+    signatureUrl = await uploadPrivateImage(input.signature, 'contracts');
+    pdfUrl = await uploadPrivatePdf(pdf, `${agencyFolder('contracts')}/${c.booking.reference}-${code}.pdf`);
     // Only one signature can ever win, even if the form is submitted twice at once
     const updated = await prisma.onlineContract.updateMany({
       where: { id: c.id, signedAt: null },

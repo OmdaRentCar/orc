@@ -80,7 +80,10 @@ export interface Booking {
   createdAt: string;
   updatedAt: string;
   car?: { brand: string; model: string; image: string | null };
+  contractState?: ContractState; // only in the bookings list
 }
+
+export type ContractState = 'none' | 'sent' | 'opened' | 'signed_online' | 'signed_in_person' | 'expired' | 'revoked';
 
 export interface Damage {
   x: number;
@@ -211,6 +214,11 @@ export interface BusinessSettings {
   companyAddress: string;
   companyTaxId: string;
   contractTerms: string;
+  siteTag: string;
+  siteTitle1: string;
+  siteTitle2: string;
+  siteText: string;
+  siteAbout: string;
 }
 
 export interface Season {

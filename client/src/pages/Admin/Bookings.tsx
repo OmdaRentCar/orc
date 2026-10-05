@@ -9,6 +9,7 @@ import { socket } from '../../services/socket';
 import { money, normalizePhone } from '../../utils/format';
 import BookingDetails from './BookingDetails';
 import BookingEditor from './BookingEditor';
+import ContractManager, { ContractBadge } from './ContractManager';
 
 const PAGE_SIZE = 15;
 const STATUS_FILTERS: { value: '' | BookingStatus; label: string }[] = [
@@ -62,6 +63,7 @@ export default function Bookings() {
   const [to, setTo] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(params.get('id') ? Number(params.get('id')) : null);
   const [editor, setEditor] = useState<{ open: boolean; booking: Booking | null }>({ open: false, booking: null });
+  const [contractFor, setContractFor] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -158,7 +160,7 @@ export default function Bookings() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/5">
-                {['Reference', 'Customer', 'Car', 'Dates', 'Total', 'Status', 'Payment', ''].map((h) => (
+                {['Reference', 'Customer', 'Car', 'Dates', 'Total', 'Status', 'Payment', 'Contract'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-brand-muted uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -189,13 +191,29 @@ export default function Bookings() {
                     {b.startDate} {b.pickupTime}<br />→ {b.endDate} {b.returnTime}
                   </td>
                   <td className="px-4 py-3 text-brand-red font-bold whitespace-nowrap">{money(b.total)}</td>
-                  <td className="px-4 py-3"><Badge status={b.status} /></td>
-                  <td className="px-4 py-3"><Badge status={b.paymentStatus} /></td>
                   <td className="px-4 py-3">
+                    <Badge status={b.status} />
+                    {/* A new booking is answered right here, without opening it */}
                     {b.status === 'pending' && (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 mt-2">
                         <button onClick={(e) => quickStatus(e, b, 'approved')} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20">Approve</button>
                         <button onClick={(e) => quickStatus(e, b, 'declined')} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20">Decline</button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3"><Badge status={b.paymentStatus} /></td>
+                  <td className="px-4 py-3">
+                    {b.status === 'declined' || b.status === 'cancelled' ? (
+                      <span className="text-xs text-brand-muted/50">—</span>
+                    ) : (
+                      <div className="flex flex-col items-start gap-1.5">
+                        <ContractBadge state={b.contractState ?? 'none'} />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setContractFor(b.id); }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/10 text-brand-text hover:bg-white/15 whitespace-nowrap"
+                        >
+                          📄 Contract
+                        </button>
                       </div>
                     )}
                   </td>
@@ -217,6 +235,12 @@ export default function Bookings() {
           load();
         }}
         onEdit={(b) => setEditor({ open: true, booking: b })}
+      />
+
+      <ContractManager
+        booking={contractFor ? bookings.find((x) => x.id === contractFor) ?? null : null}
+        onClose={() => { setContractFor(null); load(); }}
+        onChanged={load}
       />
 
       <BookingEditor

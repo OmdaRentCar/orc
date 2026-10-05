@@ -13,7 +13,8 @@ export default function CarPage() {
   const [car, setCar] = useState<Car | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [active, setActive] = useState(0);
-  const [booking, setBooking] = useState(false);
+  // Arriving with dates in the address: open the booking form straight away
+  const [booking, setBooking] = useState(() => new URLSearchParams(window.location.search).has('start'));
 
   useEffect(() => {
     setCar(null);

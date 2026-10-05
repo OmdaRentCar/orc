@@ -82,20 +82,19 @@ router.post('/block', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizePhone(input.phone);
   if (phone.length < 7) throw new HttpError(400, 'phone: invalid phone number');
 
-  const entry = await prisma.blockedCustomer.upsert({
-    where: { phone },
-    create: { phone, name: input.name || null, reason: input.reason || null },
-    update: { name: input.name || undefined, reason: input.reason || null },
-  });
+  const existing = await prisma.blockedCustomer.findFirst({ where: { phone } });
+  const entry = existing
+    ? await prisma.blockedCustomer.update({ where: { id: existing.id }, data: { name: input.name || undefined, reason: input.reason || null } })
+    : await prisma.blockedCustomer.create({ data: { phone, name: input.name || null, reason: input.reason || null } });
   await audit(req, 'block', 'customer', entry.id, `${input.phone}${input.reason ? `: ${input.reason}` : ''}`);
   res.status(201).json(entry);
 });
 
 router.delete('/block/:phone', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizePhone(req.params.phone);
-  const entry = await prisma.blockedCustomer.findUnique({ where: { phone } });
+  const entry = await prisma.blockedCustomer.findFirst({ where: { phone } });
   if (!entry) throw new HttpError(404, 'This phone number is not blocked');
-  await prisma.blockedCustomer.delete({ where: { phone } });
+  await prisma.blockedCustomer.delete({ where: { id: entry.id } });
   await audit(req, 'unblock', 'customer', entry.id, phone);
   res.json({ message: 'Customer unblocked' });
 });

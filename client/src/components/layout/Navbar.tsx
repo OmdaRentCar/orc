@@ -2,14 +2,24 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useI18n, TKey } from '../../i18n';
 import LanguageSwitcher from '../public/LanguageSwitcher';
+import BrandName from './BrandName';
+import { IS_PLATFORM } from '../../services/agency';
 
-const NAV_LINKS: { label: TKey; target: string }[] = [
-  { label: 'nav.overview', target: 'section-overview' },
-  { label: 'nav.fleet', target: 'section-fleet' },
-  { label: 'nav.features', target: 'section-features' },
-];
+// Agency site: its sections. General page: the sections for agency owners.
+const NAV_LINKS: { label: TKey; target: string }[] = IS_PLATFORM
+  ? [
+    { label: 'platform.navFeatures', target: 'section-p-features' },
+    { label: 'platform.navPricing', target: 'section-pricing' },
+    { label: 'platform.navAgencies', target: 'section-agencies' },
+    { label: 'platform.navFaq', target: 'section-faq' },
+  ]
+  : [
+    { label: 'nav.overview', target: 'section-overview' },
+    { label: 'nav.fleet', target: 'section-fleet' },
+    { label: 'nav.features', target: 'section-features' },
+  ];
 
-const SECTION_IDS = ['section-hero', 'section-overview', 'section-fleet', 'section-features', 'section-cta'];
+const SECTION_IDS = ['section-hero', 'section-overview', ...NAV_LINKS.map((l) => l.target), 'section-cta'];
 
 export default function Navbar() {
   const { t } = useI18n();
@@ -59,7 +69,7 @@ export default function Navbar() {
     <nav className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 pointer-events-none ${scrolled || !onHome ? 'bg-brand-dark/90 backdrop-blur-md border-b border-white/[0.05]' : ''}`}>
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between pointer-events-auto">
         <Link to="/" className="font-display font-extrabold text-2xl text-brand-text tracking-tight cursor-pointer" dir="ltr">
-          RentCar<span className="text-brand-red">.</span>
+          <BrandName />
         </Link>
 
         <div className="hidden md:flex items-center gap-7">
@@ -68,19 +78,26 @@ export default function Navbar() {
               {t(label)}
             </button>
           ))}
-          <Link
+          {!IS_PLATFORM && <Link
             to="/booking-status"
             className={`text-[11px] font-semibold tracking-[0.2em] uppercase transition-colors ${location.pathname === '/booking-status' ? 'text-brand-red' : 'text-brand-muted hover:text-brand-text'}`}
           >
             {t('nav.myBooking')}
-          </Link>
+          </Link>}
           <LanguageSwitcher />
-          <Link
-            to="/login"
-            className="cursor-pointer px-5 py-2.5 text-[11px] font-semibold tracking-[0.2em] uppercase border border-brand-text/25 text-brand-text hover:bg-brand-text hover:text-brand-dark transition-colors duration-300"
-          >
-            {t('nav.admin')}
-          </Link>
+          {IS_PLATFORM ? (
+            <>
+              <a href="/login" className="text-[11px] font-semibold tracking-[0.2em] uppercase text-brand-muted hover:text-brand-text transition-colors">{t('platform.login')}</a>
+              <a href="/signup" className="px-5 py-2.5 text-[11px] font-semibold tracking-[0.2em] uppercase bg-brand-red text-white hover:brightness-110 transition">{t('platform.create')}</a>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="cursor-pointer px-5 py-2.5 text-[11px] font-semibold tracking-[0.2em] uppercase border border-brand-text/25 text-brand-text hover:bg-brand-text hover:text-brand-dark transition-colors duration-300"
+            >
+              {t('nav.admin')}
+            </Link>
+          )}
         </div>
 
         <button
@@ -102,13 +119,20 @@ export default function Navbar() {
               {t(label)}
             </button>
           ))}
-          <Link to="/booking-status" onClick={() => setMenuOpen(false)} className="text-xs font-semibold tracking-[0.2em] uppercase text-brand-muted">
+          {!IS_PLATFORM && <Link to="/booking-status" onClick={() => setMenuOpen(false)} className="text-xs font-semibold tracking-[0.2em] uppercase text-brand-muted">
             {t('nav.myBooking')}
-          </Link>
+          </Link>}
           <LanguageSwitcher className="-ms-2" />
-          <Link to="/login" onClick={() => setMenuOpen(false)} className="cursor-pointer text-xs font-semibold tracking-[0.2em] uppercase text-brand-red">
-            {t('nav.admin')} →
-          </Link>
+          {IS_PLATFORM ? (
+            <>
+              <a href="/login" className="text-xs font-semibold tracking-[0.2em] uppercase text-brand-text">{t('platform.login')}</a>
+              <a href="/signup" className="text-xs font-semibold tracking-[0.2em] uppercase text-brand-red">{t('platform.create')} →</a>
+            </>
+          ) : (
+            <Link to="/login" onClick={() => setMenuOpen(false)} className="cursor-pointer text-xs font-semibold tracking-[0.2em] uppercase text-brand-red">
+              {t('nav.admin')} →
+            </Link>
+          )}
         </div>
       )}
     </nav>

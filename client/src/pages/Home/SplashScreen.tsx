@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
+import BrandName from '../../components/layout/BrandName';
 
 export default function SplashScreen() {
   const { t } = useI18n();
@@ -30,7 +31,7 @@ export default function SplashScreen() {
       </div>
       <div className="relative text-center">
         <h1 className="font-display text-6xl font-black uppercase tracking-tight text-brand-text" dir="ltr">
-          RentCar<span className="text-brand-red">.</span>
+          <BrandName />
         </h1>
         <p className="mt-2 text-brand-muted text-[11px] tracking-[0.3em] uppercase">{t('splash.tagline')}</p>
         <div className="mt-6 flex justify-center">

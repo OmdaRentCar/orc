@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import prisma from '../lib/prisma';
+import prisma, { Tx } from '../lib/prisma';
 import { HttpError, parseBody, parseId } from '../lib/http';
 import { isoDate, timeOfDay, todayISO } from '../lib/dates';
 import { normalizePhone } from '../lib/phone';
@@ -41,7 +41,7 @@ const bookingLimiter = limiter(60, 10, 'Too many booking requests, please try ag
 const statusLimiter = limiter(15, 30, 'Too many lookups, please try again later');
 const quoteLimiter = limiter(15, 300, 'Too many requests, please try again later');
 
-type Db = Prisma.TransactionClient | typeof prisma;
+type Db = Tx | typeof prisma;
 
 async function hasConflict(db: Db, carId: number, startDate: string, endDate: string, excludeId?: number): Promise<boolean> {
   const conflict = await db.booking.findFirst({
@@ -59,7 +59,7 @@ async function hasConflict(db: Db, carId: number, startDate: string, endDate: st
 
 // Locks the car row so two admins approving overlapping bookings at the same moment
 // run one after the other, and the second one sees the first one's approval
-function withCarLock<T>(carId: number, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+function withCarLock<T>(carId: number, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM cars WHERE id = ${carId} FOR UPDATE`;
     return fn(tx);
@@ -239,13 +239,13 @@ async function captchaGuard(req: Request, _res: Response, next: NextFunction): P
   next();
 }
 
-router.post('/public', bookingLimiter, captchaGuard, uploadDocument.single('document'), async (req: Request, res: Response): Promise<void> => {
+router.post('/public', bookingLimiter, captchaGuard, uploadDocument, async (req: Request, res: Response): Promise<void> => {
   const uploadedDoc = (req.file as Express.Multer.File & { path?: string } | undefined)?.path ?? null;
   try {
     const input = parseBody(publicBookingSchema, req.body);
     if (input.start_date < todayISO()) throw new HttpError(400, 'Pick-up date cannot be in the past');
 
-    const blocked = await prisma.blockedCustomer.findUnique({ where: { phone: normalizePhone(input.phone) } });
+    const blocked = await prisma.blockedCustomer.findFirst({ where: { phone: normalizePhone(input.phone) } });
     if (blocked) throw new HttpError(403, 'We cannot accept online bookings from this phone number. Please contact us directly.');
 
     const car = await prisma.car.findUnique({ where: { id: input.car_id } });
@@ -343,12 +343,27 @@ router.get('/status', statusLimiter, async (req: Request, res: Response): Promis
 
 // ─── Admin ────────────────────────────────────────────────────────────────
 
+// Where the contract of a booking stands, for the list and the contract manager
+export function contractState(b: { onlineContract: { signedAt: Date | null; revokedAt: Date | null; expiresAt: Date; viewedAt: Date | null } | null; inspections: { type: string }[] }) {
+  const c = b.onlineContract;
+  if (c?.signedAt) return 'signed_online';
+  if (b.inspections.some((i) => i.type === 'checkout')) return 'signed_in_person';
+  if (c?.revokedAt) return 'revoked';
+  if (c && c.expiresAt < new Date()) return 'expired';
+  if (c) return c.viewedAt ? 'opened' : 'sent';
+  return 'none';
+}
+
 router.get('/', authMiddleware, async (_req: Request, res: Response): Promise<void> => {
   const bookings = await prisma.booking.findMany({
-    include: { car: carSummary },
+    include: {
+      car: carSummary,
+      onlineContract: { select: { signedAt: true, revokedAt: true, expiresAt: true, viewedAt: true } },
+      inspections: { select: { type: true } },
+    },
     orderBy: { createdAt: 'desc' },
   });
-  res.json(bookings);
+  res.json(bookings.map(({ onlineContract, inspections, ...b }) => ({ ...b, contractState: contractState({ onlineContract, inspections }) })));
 });
 
 router.get('/pending', authMiddleware, async (_req: Request, res: Response): Promise<void> => {

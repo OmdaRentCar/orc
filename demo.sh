@@ -42,9 +42,12 @@ if [ "$fresh" = true ] || [ "${1:-}" = "reset" ]; then
 fi
 
 echo "Starting the demo..."
-(cd server && DATABASE_URL="$DEMO_URL" PORT=$API_PORT CLIENT_URL="http://localhost:$WEB_PORT" \
+# No Cloudflare captcha in the demo: it can refuse *.localhost addresses and get in the way of testing
+(cd server && DATABASE_URL="$DEMO_URL" PORT=$API_PORT CLIENT_URL="http://localhost:$WEB_PORT" TURNSTILE_SECRET_KEY= \
+  AGENCY_URL_TEMPLATE="http://{slug}.localhost:$WEB_PORT" DEFAULT_AGENCY_SLUG=rentcar \
+  PLATFORM_URL="http://localhost:$WEB_PORT" API_PUBLIC_URL="http://localhost:$API_PORT" \
   setsid nohup npx tsx watch src/index.ts > "../$LOGS/demo-server.log" 2>&1 < /dev/null &)
-(cd client && API_PROXY_TARGET="http://localhost:$API_PORT" \
+(cd client && API_PROXY_TARGET="http://localhost:$API_PORT" VITE_TURNSTILE_SITE_KEY= \
   setsid nohup npx vite --port $WEB_PORT --strictPort > "../$LOGS/demo-client.log" 2>&1 < /dev/null &)
 
 for _ in $(seq 1 60); do
@@ -57,10 +60,11 @@ if curl -s "localhost:$API_PORT/api/health" >/dev/null 2>&1; then
 
   RentCar demo is running
   -----------------------
-  Site:        http://localhost:$WEB_PORT
-  Admin:       http://localhost:$WEB_PORT/login
-  Owner:       admin / demo1234
-  Staff:       agent / demo1234
+  1. General page: http://localhost:$WEB_PORT          (for agency owners: features, pricing, agencies)
+  2. Agency sites:  http://rentcar.localhost:$WEB_PORT   http://sahel.localhost:$WEB_PORT
+                    http://djerba-drive.localhost:$WEB_PORT   http://capbon.localhost:$WEB_PORT (suspended)
+  3. Dashboards:    http://localhost:$WEB_PORT/login   (one login: admin / demo1234, or agent / demo1234)
+  4. Console:       http://localhost:$WEB_PORT/login   (console@demo.test / demo1234)
   Demo emails: ${DEMO_EMAIL:-none (set SMTP_USER in server/.env)}
   Guide:       DEMO.md
   Stop:        ./demo.sh stop      Fresh data: ./demo.sh reset

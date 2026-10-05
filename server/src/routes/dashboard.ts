@@ -4,6 +4,7 @@ import { parseId } from '../lib/http';
 import { addDaysISO, todayISO } from '../lib/dates';
 import { authMiddleware } from '../middleware/auth';
 import { carAlerts } from '../services/jobs';
+import { requireAgency } from '../lib/tenant';
 import { localInstant } from '../lib/dates';
 
 const router = Router();
@@ -71,7 +72,8 @@ router.get('/', authMiddleware, async (_req: Request, res: Response): Promise<vo
              COUNT(*) FILTER (WHERE status NOT IN ('declined', 'cancelled'))::int AS bookings,
              COALESCE(SUM(total) FILTER (WHERE status IN ('approved', 'picked_up', 'completed')), 0)::float AS revenue
       FROM bookings
-      WHERE substr(start_date, 1, 7) >= ${months[0]} AND substr(start_date, 1, 7) <= ${months[11]}
+      WHERE agency_id = ${requireAgency().id}
+        AND substr(start_date, 1, 7) >= ${months[0]} AND substr(start_date, 1, 7) <= ${months[11]}
       GROUP BY month
     `,
   ]);

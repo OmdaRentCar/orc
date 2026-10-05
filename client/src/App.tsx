@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AgencyProvider } from './context/AgencyContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import PublicLayout from './pages/Public/PublicLayout';
 import HomePage from './pages/Home/HomePage';
@@ -21,6 +22,10 @@ import Settings from './pages/Admin/Settings';
 import Handover from './pages/Admin/Handover';
 import Fines from './pages/Admin/Fines';
 import Finances from './pages/Admin/Finances';
+import Billing from './pages/Admin/Billing';
+import TestPayment from './pages/Admin/TestPayment';
+import PlatformApp from './platform/PlatformApp';
+import { IS_PLATFORM, IS_PLATFORM_PAGE } from './services/agency';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -66,6 +71,10 @@ function AppRoutes() {
         <Route path="team" element={<OwnerRoute><Team /></OwnerRoute>} />
         <Route path="activity" element={<OwnerRoute><Activity /></OwnerRoute>} />
         <Route path="settings" element={<Settings />} />
+        <Route path="billing" element={<OwnerRoute><Billing /></OwnerRoute>} />
+        <Route path="billing/test-pay/:id" element={<OwnerRoute><TestPayment /></OwnerRoute>} />
+        {/* A wrong dashboard address stays in the dashboard */}
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -73,11 +82,20 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // The platform's own pages (sales page, sign-up, marketplace, console) have no agency
+  if (IS_PLATFORM_PAGE) return <AgencyProvider><PlatformApp /></AgencyProvider>;
+  // The general page has no dashboard of its own: logging in happens on the single login page
+  if (IS_PLATFORM && window.location.pathname.startsWith('/admin')) {
+    window.location.replace('/login');
+    return null;
+  }
   return (
+    <AgencyProvider>
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
+    </AgencyProvider>
   );
 }

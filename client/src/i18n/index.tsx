@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, R
 import en, { Dictionary } from './en';
 import fr from './fr';
 import ar from './ar';
+import { useAgency } from '../context/AgencyContext';
 
 export type Lang = 'en' | 'fr' | 'ar';
 export const LANGS: Lang[] = ['en', 'fr', 'ar'];
@@ -39,6 +40,7 @@ function initialLang(): Lang {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang);
+  const { agency } = useAgency();
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
 
   const setLang = useCallback((next: Lang) => {
@@ -59,8 +61,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const t = useCallback((key: TKey, vars?: Record<string, string | number>) => {
     const lookup = (dict: Dictionary) => key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], dict);
     const text = (lookup(DICTIONARIES[lang]) ?? lookup(en) ?? key) as string;
-    return vars ? text.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? '')) : text;
-  }, [lang]);
+    const all: Record<string, string | number> = { brand: agency.name, ...vars };
+    return text.replace(/\{(\w+)\}/g, (match, name) => (name in all ? String(all[name]) : vars ? '' : match));
+  }, [lang, agency.name]);
 
   const formatDate = useCallback((iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) => {
     // Plain YYYY-MM-DD dates are formatted in UTC so they never shift by a day
@@ -68,7 +71,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [lang]);
 
   // "438 DT", or "438 د.ت" in Arabic so it reads correctly right to left
-  const money = useCallback((amount: number) => `${Number(amount.toFixed(3))} ${lang === 'ar' ? 'د.ت' : 'DT'}`, [lang]);
+  const money = useCallback((amount: number) => {
+    const n = new Intl.NumberFormat(lang === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: 3 }).format(Number(amount.toFixed(3)));
+    return `${n} ${lang === 'ar' ? 'د.ت' : 'DT'}`;
+  }, [lang]);
 
   const value = useMemo(() => ({ lang, dir, setLang, t, formatDate, money }), [lang, dir, setLang, t, formatDate, money]) as I18nValue;
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

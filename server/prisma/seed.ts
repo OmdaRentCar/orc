@@ -1,15 +1,28 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { createPrismaClient } from '../src/lib/prisma';
+import { runAsAgency, runUnscoped, AGENCY_SELECT } from '../src/lib/tenant';
 
 const prisma = createPrismaClient();
 
 async function main() {
+  // The first agency; the site answers as this one when no agency is named in the address
+  const slug = process.env.DEFAULT_AGENCY_SLUG || 'rentcar';
+  const agency = await runUnscoped(() => prisma.agency.upsert({
+    where: { slug },
+    create: { slug, name: process.env.BRAND_NAME || 'RentCar' },
+    update: {},
+    select: AGENCY_SELECT,
+  }));
+  await runAsAgency(agency, seedAgency);
+}
+
+async function seedAgency() {
   const username = process.env.SEED_ADMIN_USERNAME || 'admin';
   const password = process.env.SEED_ADMIN_PASSWORD || 'admin123';
   const email = process.env.SEED_ADMIN_EMAIL || 'contact@example.com';
 
-  const existing = await prisma.adminUser.findUnique({ where: { username } });
+  const existing = await prisma.adminUser.findFirst({ where: { username } });
   if (!existing) {
     await prisma.adminUser.create({
       // The first account must be an owner, or nobody could manage the team or business settings
